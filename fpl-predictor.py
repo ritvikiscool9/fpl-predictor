@@ -82,12 +82,6 @@ urlLiveGameweek = "https://fantasy.premierleague.com/api/event/{gameweek}/live/"
 headers = {"X-Auth-Token": API_KEY}
 response = requests.get(urlFixtures, headers=headers)
 
-# if response.status_code == 200:
-#     data = response.json()
-#     print(data)
-# else:
-#     print("Error:", response.status_code, response.text)
-
 # Create a mapping between football-data.org and the FPL API
 def create_team_mapping():
     """Create team mapping with caching to avoid repeated API calls"""
@@ -229,6 +223,10 @@ def create_player_mapping():
     
     # Get player data from each team's squad
     playerMapping = {}
+    total_teams = len(fdTeams)
+    processed_teams = 0
+    
+    print(f"Processing {total_teams} teams for player mapping...")
     
     for team in fdTeams:
         fd_team_id = team['id']
@@ -242,21 +240,56 @@ def create_player_mapping():
         squadUrl = f"https://api.football-data.org/v4/teams/{fd_team_id}"
         
         import time
-        time.sleep(1.5)  # Longer delay to avoid rate limiting (max 10 requests per minute)
+        time.sleep(6.5)  # Wait 6.5 seconds between requests (safer for 10 req/min limit)
         
-        squadResponse = requests.get(squadUrl, headers=headers)
+        max_retries = 3
+        retry_count = 0
+        squadResponse = None
         
-        if squadResponse.status_code != 200:
-            print(f"Warning: Failed to get squad for team {team['name']} (Status: {squadResponse.status_code})")
+        while retry_count < max_retries:
+            squadResponse = requests.get(squadUrl, headers=headers)
+            
+            if squadResponse.status_code == 200:
+                break
+            elif squadResponse.status_code == 429:  # Rate limit
+                wait_time = (retry_count + 1) * 15  # Wait 15, 30, 45 seconds
+                print(f"Rate limit hit for {team['name']}, waiting {wait_time} seconds...")
+                time.sleep(wait_time)
+                retry_count += 1
+            else:
+                print(f"Warning: Failed to get squad for team {team['name']} (Status: {squadResponse.status_code})")
+                break
+        
+        if squadResponse is None or squadResponse.status_code != 200:
+            print(f"Skipping team {team['name']} after {retry_count} retries")
+            processed_teams += 1
+            print(f"Progress: {processed_teams}/{total_teams} teams processed")
             continue
             
         squadData = squadResponse.json()
         fdPlayers = squadData.get('squad', [])
         
         # Match players between APIs
+        matched_count = 0
+        total_players = len(fdPlayers)
+        
         for fdPlayer in fdPlayers:
             fd_player_id = fdPlayer['id']
             fd_player_name = fdPlayer['name'].lower()
+            player_position = fdPlayer.get('position', 'Unknown')
+            
+            # Skip obvious non-FPL players (youth/academy players, etc.)
+            skip_keywords = ['u18', 'u19', 'u21', 'u23', 'academy', 'youth', 'development']
+            if any(keyword in fd_player_name for keyword in skip_keywords):
+                continue
+                
+            # Skip players who are likely loans or not in FPL (common patterns)
+            likely_non_fpl = ['russ oakley', 'aidan borland', 'max merrick', 'ted curd', 
+                            'reggie walsh', 'shumaira mheuka', 'ollie harrison', 
+                            'kieran morrison', 'tommy pilling', 'kaden braithwaite',
+                            'jaden heskey', 'reigan heskey', 'max thompson']
+            if fd_player_name in likely_non_fpl:
+                continue
             
             # Try to find matching FPL player with improved matching
             fpl_player_id = None
@@ -274,28 +307,54 @@ def create_player_mapping():
                 else:
                     # Try partial matches with better logic
                     fd_name_parts = clean_fd_name.split()
+                    best_match = None
+                    best_score = 0
                     
                     for fpl_name, fpl_id in team_players.items():
                         fpl_parts = fpl_name.split()
+                        match_score = 0
                         
-                        # Check if last names match (most reliable)
+                        # Check if last names match (most reliable) - high score
                         if len(fd_name_parts) > 0 and len(fpl_parts) > 0:
                             if fd_name_parts[-1] == fpl_parts[-1]:
-                                fpl_player_id = fpl_id
-                                break
+                                match_score += 10
+                        
+                        # Check for first name match
+                        if len(fd_name_parts) > 0 and len(fpl_parts) > 0:
+                            if fd_name_parts[0] == fpl_parts[0]:
+                                match_score += 5
                         
                         # Check if any significant part matches (length > 3)
                         for fd_part in fd_name_parts:
                             if len(fd_part) > 3 and fd_part in fpl_name:
-                                fpl_player_id = fpl_id
-                                break
-                        if fpl_player_id:
-                            break
+                                match_score += 3
+                        
+                        # Update best match if this one is better
+                        if match_score > best_score and match_score >= 8:  # Require decent confidence
+                            best_match = fpl_id
+                            best_score = match_score
+                    
+                    fpl_player_id = best_match
             
             if fpl_player_id:
                 playerMapping[fd_player_id] = fpl_player_id
+                matched_count += 1
             else:
-                print(f"Warning: Could not match player {fdPlayer['name']} from {team['name']}")
+                # Only show warning for likely first-team players
+                if player_position in ['Goalkeeper', 'Centre-Back', 'Left-Back', 'Right-Back', 
+                                     'Defensive Midfield', 'Central Midfield', 'Attacking Midfield',
+                                     'Left Winger', 'Right Winger', 'Centre-Forward']:
+                    print(f"Warning: Could not match player {fdPlayer['name']} ({player_position}) from {team['name']}")
+        
+        if total_players > 0:
+            match_rate = (matched_count / total_players) * 100
+            processed_teams += 1
+            print(f"Team {team['name']}: Matched {matched_count}/{total_players} players ({match_rate:.1f}%)")
+            print(f"Progress: {processed_teams}/{total_teams} teams processed")
+        else:
+            processed_teams += 1
+            print(f"No players found for {team['name']}")
+            print(f"Progress: {processed_teams}/{total_teams} teams processed")
     
     # Save to cache before returning
     save_to_cache(playerMapping, PLAYER_MAPPING_CACHE)
