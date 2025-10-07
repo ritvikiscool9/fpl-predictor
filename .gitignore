@@ -4,3 +4,7 @@ venv/
 
 # Ignore environment variables
 .env
+
+# Ignore cache files (contains API data that expires)
+cache/
+*.json

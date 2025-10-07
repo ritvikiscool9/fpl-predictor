@@ -794,13 +794,27 @@ def generate_transfer_recommendations(match_data, budget=1000, top_n=3):
     
     # Get all predictions
     all_predictions = []
+    player_ids_seen = set()
+    duplicates_found = 0
+    
     for player in players:
         try:
+            # Check for duplicate players in source data
+            player_id = player['id']
+            if player_id in player_ids_seen:
+                duplicates_found += 1
+                print(f"Warning: Duplicate player ID {player_id} found: {player['first_name']} {player['second_name']}")
+                continue
+            player_ids_seen.add(player_id)
+            
             prediction = predict_player_points(player, match_data)
             if prediction['predicted_points'] > 3:  # Only consider decent predictions
                 all_predictions.append(prediction)
         except Exception as e:
             continue
+    
+    if duplicates_found > 0:
+        print(f"Found {duplicates_found} duplicate players in FPL data")
     
     # Sort by value rating (points per million)
     all_predictions.sort(key=lambda x: x['value_rating'], reverse=True)
@@ -811,13 +825,174 @@ def generate_transfer_recommendations(match_data, budget=1000, top_n=3):
     # Debug: print budget info
     print(f"Budget: £{budget/10}m, Total players: {len(all_predictions)}, Affordable: {len(affordable_players)}")
     
+    # Create separate sorted lists to avoid mutation issues
+    highest_predicted_sorted = sorted(all_predictions.copy(), key=lambda x: x['predicted_points'], reverse=True)
+    differential_picks = [p for p in affordable_players if p['ownership'] < 5]
+    
+    # Remove duplicates by player_id and keep only unique players
+    def remove_duplicates(player_list):
+        seen_ids = set()
+        unique_players = []
+        for player in player_list:
+            if player['player_id'] not in seen_ids:
+                seen_ids.add(player['player_id'])
+                unique_players.append(player)
+        return unique_players
+    
     recommendations = {
-        'best_value': affordable_players[:top_n],
-        'highest_predicted': sorted(all_predictions, key=lambda x: x['predicted_points'], reverse=True)[:top_n],
-        'differential_picks': [p for p in affordable_players if p['ownership'] < 5][:top_n]
+        'best_value': remove_duplicates(affordable_players[:top_n]),
+        'highest_predicted': remove_duplicates(highest_predicted_sorted[:top_n]),
+        'differential_picks': remove_duplicates(differential_picks[:top_n])
     }
     
     return recommendations
+
+def build_optimal_team(match_data, budget=1000):  # £100m budget
+    """
+    Build optimal 15-player FPL team following all constraints
+    
+    FPL Rules:
+    - 2 Goalkeepers, 5 Defenders, 5 Midfielders, 3 Forwards
+    - Max 3 players from same team
+    - Budget constraint (default £100m)
+    - Starting XI: 1 GK, 3-5 DEF, 2-5 MID, 1-3 FWD
+    """
+    fpl_data = match_data['fpl_data']
+    players = fpl_data['elements']
+    teams = {team['id']: team['name'] for team in fpl_data['teams']}
+    
+    # Get all predictions
+    all_predictions = []
+    for player in players:
+        try:
+            prediction = predict_player_points(player, match_data)
+            prediction['team_name'] = teams.get(prediction['team_id'], 'Unknown')
+            all_predictions.append(prediction)
+        except Exception as e:
+            continue
+    
+    # Sort by predicted points within each position
+    goalkeepers = sorted([p for p in all_predictions if p['position'] == 1], 
+                        key=lambda x: x['predicted_points'], reverse=True)
+    defenders = sorted([p for p in all_predictions if p['position'] == 2], 
+                      key=lambda x: x['predicted_points'], reverse=True)
+    midfielders = sorted([p for p in all_predictions if p['position'] == 3], 
+                        key=lambda x: x['predicted_points'], reverse=True)
+    forwards = sorted([p for p in all_predictions if p['position'] == 4], 
+                     key=lambda x: x['predicted_points'], reverse=True)
+    
+    # Team selection algorithm with constraints
+    def select_squad_with_constraints():
+        selected_squad = []
+        team_counts = {}
+        total_cost = 0
+        budget_millions = budget / 10  # Convert to millions
+        
+        # Position requirements: [position_type, min_required, max_allowed]
+        requirements = [
+            (goalkeepers, 'GK', 2, 2),
+            (defenders, 'DEF', 5, 5), 
+            (midfielders, 'MID', 5, 5),
+            (forwards, 'FWD', 3, 3)
+        ]
+        
+        # Greedy selection with constraints
+        for player_pool, pos_name, min_req, max_req in requirements:
+            position_selected = 0
+            
+            for player in player_pool:
+                if position_selected >= max_req:
+                    break
+                    
+                team_id = player['team_id']
+                player_cost = player['price']
+                
+                # Check constraints
+                if (total_cost + player_cost <= budget_millions and 
+                    team_counts.get(team_id, 0) < 3 and 
+                    position_selected < max_req):
+                    
+                    selected_squad.append(player)
+                    team_counts[team_id] = team_counts.get(team_id, 0) + 1
+                    total_cost += player_cost
+                    position_selected += 1
+            
+            # Check if we met minimum requirements
+            if position_selected < min_req:
+                print(f"Warning: Could not select minimum {min_req} {pos_name}s (only got {position_selected})")
+        
+        return selected_squad, total_cost
+    
+    squad, total_cost = select_squad_with_constraints()
+    
+    # Determine best formation and starting XI
+    squad_gk = [p for p in squad if p['position'] == 1]
+    squad_def = [p for p in squad if p['position'] == 2]
+    squad_mid = [p for p in squad if p['position'] == 3] 
+    squad_fwd = [p for p in squad if p['position'] == 4]
+    
+    # Sort each position by predicted points for starting XI selection
+    squad_gk.sort(key=lambda x: x['predicted_points'], reverse=True)
+    squad_def.sort(key=lambda x: x['predicted_points'], reverse=True)
+    squad_mid.sort(key=lambda x: x['predicted_points'], reverse=True)
+    squad_fwd.sort(key=lambda x: x['predicted_points'], reverse=True)
+    
+    # Try different formations and pick best total points
+    formations = [
+        {'name': '3-4-3', 'def': 3, 'mid': 4, 'fwd': 3},
+        {'name': '3-5-2', 'def': 3, 'mid': 5, 'fwd': 2},
+        {'name': '4-3-3', 'def': 4, 'mid': 3, 'fwd': 3},
+        {'name': '4-4-2', 'def': 4, 'mid': 4, 'fwd': 2},
+        {'name': '4-5-1', 'def': 4, 'mid': 5, 'fwd': 1},
+        {'name': '5-3-2', 'def': 5, 'mid': 3, 'fwd': 2},
+        {'name': '5-4-1', 'def': 5, 'mid': 4, 'fwd': 1}
+    ]
+    
+    best_formation = None
+    best_starting_xi = None
+    best_bench = None
+    best_total_points = 0
+    
+    for formation in formations:
+        if (len(squad_def) >= formation['def'] and 
+            len(squad_mid) >= formation['mid'] and 
+            len(squad_fwd) >= formation['fwd']):
+            
+            starting_xi = []
+            
+            # Add best GK
+            starting_xi.extend(squad_gk[:1])
+            
+            # Add players by formation
+            starting_xi.extend(squad_def[:formation['def']])
+            starting_xi.extend(squad_mid[:formation['mid']])
+            starting_xi.extend(squad_fwd[:formation['fwd']])
+            
+            # Calculate total predicted points for starting XI
+            formation_points = sum(p['predicted_points'] for p in starting_xi)
+            
+            if formation_points > best_total_points:
+                best_total_points = formation_points
+                best_formation = formation
+                best_starting_xi = starting_xi
+                
+                # Create bench (remaining players)
+                bench = []
+                starting_ids = {p['player_id'] for p in starting_xi}
+                for player in squad:
+                    if player['player_id'] not in starting_ids:
+                        bench.append(player)
+                best_bench = bench
+    
+    return {
+        'squad': squad,
+        'starting_xi': best_starting_xi,
+        'bench': best_bench,
+        'formation': best_formation,
+        'total_cost': total_cost,
+        'budget_remaining': (budget/10) - total_cost,
+        'predicted_points': best_total_points
+    }
 
 # Test the prediction model
 print("\n" + "="*60)
@@ -852,7 +1027,8 @@ try:
     
     if recommendations['highest_predicted']:
         print("\n📈 Highest Predicted Points:")
-        for i, player in enumerate(recommendations['highest_predicted'][:3], 1):
+        highest_list = recommendations['highest_predicted'][:3]  # Take slice first
+        for i, player in enumerate(highest_list, 1):
             print(f"  {i}. {player['name']} - {player['predicted_points']} pts "
                   f"(£{player['price']}m, {player['ownership']}% owned)")
     else:
@@ -863,6 +1039,56 @@ try:
         for i, player in enumerate(recommendations['differential_picks'][:3], 1):
             print(f"  {i}. {player['name']} - {player['predicted_points']} pts "
                   f"(£{player['price']}m, {player['ownership']}% owned)")
+    
+    # Generate optimal 15-player team
+    print("\n" + "="*80)
+    print("🏆 OPTIMAL 15-PLAYER TEAM FOR NEXT GAMEWEEK")
+    print("="*80)
+    
+    optimal_team = build_optimal_team(match_data, budget=1000)  # £100m budget
+    
+    print(f"\n💰 BUDGET: £{optimal_team['total_cost']:.1f}m / £100.0m (£{optimal_team['budget_remaining']:.1f}m remaining)")
+    print(f"📊 FORMATION: {optimal_team['formation']['name']}")
+    print(f"⚡ PREDICTED POINTS: {optimal_team['predicted_points']:.1f}")
+    
+    # Display Starting XI
+    print(f"\n🔥 STARTING XI ({optimal_team['formation']['name']}):")
+    
+    starting_xi = optimal_team['starting_xi']
+    position_names = {1: 'GK', 2: 'DEF', 3: 'MID', 4: 'FWD'}
+    
+    # Group and display by position
+    for pos_num, pos_name in position_names.items():
+        position_players = [p for p in starting_xi if p['position'] == pos_num]
+        if position_players:
+            print(f"\n  {pos_name}:")
+            for player in position_players:
+                print(f"    • {player['name']} ({player['team_name']}) - {player['predicted_points']:.1f}pts - £{player['price']:.1f}m")
+    
+    # Display Bench
+    print(f"\n🪑 BENCH (4 players):")
+    bench = optimal_team['bench']
+    for i, player in enumerate(bench, 1):
+        pos_name = position_names.get(player['position'], 'UNK')
+        print(f"  {i}. {player['name']} ({pos_name}) - {player['predicted_points']:.1f}pts - £{player['price']:.1f}m")
+    
+    # Team summary stats
+    print(f"\n📈 TEAM STATISTICS:")
+    team_count = {}
+    for player in optimal_team['squad']:
+        team_name = player['team_name']
+        team_count[team_name] = team_count.get(team_name, 0) + 1
+    
+    print("  Team Distribution:")
+    for team, count in sorted(team_count.items(), key=lambda x: x[1], reverse=True):
+        print(f"    • {team}: {count} players")
+    
+    # Position breakdown
+    pos_breakdown = {1: 0, 2: 0, 3: 0, 4: 0}
+    for player in optimal_team['squad']:
+        pos_breakdown[player['position']] += 1
+    
+    print(f"  Squad Composition: {pos_breakdown[1]} GK, {pos_breakdown[2]} DEF, {pos_breakdown[3]} MID, {pos_breakdown[4]} FWD")
     
 except Exception as e:
     print(f"Error testing prediction model: {e}")
