@@ -7,10 +7,26 @@ import os
 import time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from supabase import create_client, Client 
 
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
+
+# Initialize Supabase client
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("Supabase credentials not found. Check your .env file.")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Supabase connection
+supabase : Client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
 
 # Cache settings
 CACHE_DIR = "cache"
@@ -63,6 +79,112 @@ def is_cache_valid(cache_file, max_age_hours=CACHE_DURATION_HOURS):
     """Check if cache file exists and is still valid"""
     return load_from_cache(cache_file, max_age_hours) is not None
 
+# Database helper functions
+def save_teams_to_db(teams_data):
+    """Save teams data to Supabase database"""
+    try:
+        for team in teams_data:
+            # Use upsert to avoid duplicates
+            result = supabase.table('teams').upsert({
+                'fpl_team_id': team['id'],
+                'name': team['name'],
+                'short_name': team['short_name'],
+                'code': team.get('code')
+            }, on_conflict='fpl_team_id').execute()
+        print(f"Successfully saved {len(teams_data)} teams to database")
+    except Exception as e:
+        print(f"Error saving teams to database: {e}")
+        raise
+
+def get_teams_from_db():
+    """Get all teams from database"""
+    try:
+        result = supabase.table('teams').select('*').execute()
+        return result.data
+    except Exception as e:
+        print(f"Error getting teams from database: {e}")
+        return []
+
+def save_players_to_db(players_data, team_mapping):
+    """Save players data to Supabase database"""
+    try:
+        saved_count = 0
+        for player in players_data:
+            # Find the database team_id using FPL team_id
+            team_id = None
+            fpl_team_id = player['team']
+            
+            # Get team database ID
+            team_result = supabase.table('teams').select('id').eq('fpl_team_id', fpl_team_id).execute()
+            if team_result.data:
+                team_id = team_result.data[0]['id']
+            
+            if team_id:
+                result = supabase.table('players').upsert({
+                    'fpl_player_id': player['id'],
+                    'first_name': player['first_name'],
+                    'second_name': player['second_name'],
+                    'web_name': player['web_name'],
+                    'team_id': team_id,
+                    'element_type': player['element_type'],
+                    'status': player.get('status', 'a')
+                }, on_conflict='fpl_player_id').execute()
+                saved_count += 1
+        
+        print(f"Successfully saved {saved_count} players to database")
+    except Exception as e:
+        print(f"Error saving players to database: {e}")
+        raise
+
+def get_team_mapping_from_db():
+    """Get team mapping from database (football_data_id -> fpl_team_id)"""
+    try:
+        result = supabase.table('teams').select('football_data_team_id, fpl_team_id').execute()
+        mapping = {}
+        for team in result.data:
+            if team['football_data_team_id']:
+                mapping[team['football_data_team_id']] = team['fpl_team_id']
+        return mapping
+    except Exception as e:
+        print(f"Error getting team mapping from database: {e}")
+        return {}
+
+def save_team_mapping_to_db(fd_team_id, fpl_team_id):
+    """Save individual team mapping to database"""
+    try:
+        # Update the team with football_data_team_id
+        result = supabase.table('teams').update({
+            'football_data_team_id': fd_team_id
+        }).eq('fpl_team_id', fpl_team_id).execute()
+        return result.data
+    except Exception as e:
+        print(f"Error saving team mapping to database: {e}")
+        return None
+
+def get_player_mapping_from_db():
+    """Get player mapping from database (football_data_id -> fpl_player_id)"""
+    try:
+        result = supabase.table('players').select('football_data_player_id, fpl_player_id').execute()
+        mapping = {}
+        for player in result.data:
+            if player['football_data_player_id']:
+                mapping[player['football_data_player_id']] = player['fpl_player_id']
+        return mapping
+    except Exception as e:
+        print(f"Error getting player mapping from database: {e}")
+        return {}
+
+def save_player_mapping_to_db(fd_player_id, fpl_player_id):
+    """Save individual player mapping to database"""
+    try:
+        result = supabase.table('players').update({
+            'football_data_player_id': fd_player_id
+        }).eq('fpl_player_id', fpl_player_id).execute()
+        return result.data
+    except Exception as e:
+        print(f"Error saving player mapping to database: {e}")
+        return None
+
 # Team information
 urlTeams = "https://api.football-data.org/v4/competitions/PL/teams"
 # Team fixtures
@@ -84,13 +206,16 @@ response = requests.get(urlFixtures, headers=headers)
 
 # Create a mapping between football-data.org and the FPL API
 def create_team_mapping():
-    """Create team mapping with caching to avoid repeated API calls"""
+    """Create team mapping using Supabase database instead of JSON cache"""
     
-    # Try to load from cache first
-    cached_mapping = load_from_cache(TEAM_MAPPING_CACHE)
-    if cached_mapping is not None:
-        return cached_mapping
+    # Try to load existing mapping from database first
+    existing_mapping = get_team_mapping_from_db()
+    if existing_mapping:
+        print(f"Loading existing team mapping from database: {len(existing_mapping)} teams")
+        return existing_mapping
 
+    print("Creating fresh team mapping and saving to database...")
+    
     # Get FPL team data
     fplResponse = requests.get(urlFantasy)
     if fplResponse.status_code != 200:
@@ -98,17 +223,20 @@ def create_team_mapping():
 
     fplData = fplResponse.json()
     fplTeams = {team['name']: team['id'] for team in fplData['teams']}
+    
+    # Save FPL teams to database
+    save_teams_to_db(fplData['teams'])
 
     # Get football-data.org teams
     headers = {"X-Auth-Token": API_KEY}    
     fdResponse = requests.get(urlTeams, headers=headers)
     if fdResponse.status_code != 200:
-        raise Exception(f"Failed to get data from FPL API: {fdResponse.status_code}")
+        raise Exception(f"Failed to get data from football-data.org API: {fdResponse.status_code}")
     
     fdData = fdResponse.json()
     fdTeams = {team['name']: team['id'] for team in fdData['teams']}
 
-    # Manuel mapping teams with different names between APIs
+    # Manual mapping teams with different names between APIs
     nameMapping = {
         'Brighton & Hove Albion FC': 'Brighton',
         'Newcastle United FC': 'Newcastle',
@@ -132,20 +260,27 @@ def create_team_mapping():
         'Leeds United FC': 'Leeds'
     }
 
-    # Create the mapping dictionary
+    # Create the mapping dictionary and save to database
     teamMapping = {}
     for fdName, fdID in fdTeams.items():
+        fpl_team_id = None
+        
         # Try direct name match first
         if fdName in fplTeams:
-            teamMapping[fdID] = fplTeams[fdName]
+            fpl_team_id = fplTeams[fdName]
         # Try mapped name
         elif fdName in nameMapping and nameMapping[fdName] in fplTeams:
-            teamMapping[fdID] = fplTeams[nameMapping[fdName]]
+            fpl_team_id = fplTeams[nameMapping[fdName]]
         else:
             print(f"Warning: Could not map team {fdName}")
+            continue
+        
+        if fpl_team_id:
+            teamMapping[fdID] = fpl_team_id
+            # Save the mapping to database
+            save_team_mapping_to_db(fdID, fpl_team_id)
     
-    # Save to cache before returning
-    save_to_cache(teamMapping, TEAM_MAPPING_CACHE)
+    print(f"Successfully created and saved mapping for {len(teamMapping)} teams to database")
     return teamMapping
 
 def get_fpl_team_id(fd_team_id):
@@ -167,16 +302,17 @@ fplID = get_fpl_team_id(57)
 print(fplID)
 def create_player_mapping():
     """
-    Creates a mapping between football-data.org players and FPL players
+    Creates a mapping between football-data.org players and FPL players using database
     Returns: Dictionary mapping fd_player_id -> fpl_player_id
     """
     
-    # Try to load from cache first
-    cached_mapping = load_from_cache(PLAYER_MAPPING_CACHE)
-    if cached_mapping is not None:
-        return cached_mapping
+    # Try to load existing mapping from database first
+    existing_mapping = get_player_mapping_from_db()
+    if existing_mapping:
+        print(f"Loading existing player mapping from database: {len(existing_mapping)} players")
+        return existing_mapping
     
-    print("Building fresh player mapping from APIs...")
+    print("Building fresh player mapping from APIs and saving to database...")
     
     # Get player data from FPL bootstrap (contains all players)
     fplResponse = requests.get(urlFantasy)
@@ -185,6 +321,9 @@ def create_player_mapping():
     
     fplData = fplResponse.json()
     fplPlayers = fplData['elements']  # All FPL players
+    
+    # Save FPL players to database
+    save_players_to_db(fplPlayers, {})  # Empty mapping for now, will be filled later
     
     # Create FPL player lookup by team and name
     fplPlayerLookup = {}
@@ -356,8 +495,11 @@ def create_player_mapping():
             print(f"No players found for {team['name']}")
             print(f"Progress: {processed_teams}/{total_teams} teams processed")
     
-    # Save to cache before returning
-    save_to_cache(playerMapping, PLAYER_MAPPING_CACHE)
+    # Save player mappings to database
+    for fd_player_id, fpl_player_id in playerMapping.items():
+        save_player_mapping_to_db(fd_player_id, fpl_player_id)
+    
+    print(f"Successfully saved {len(playerMapping)} player mappings to database")
     return playerMapping
 
 def get_fpl_player_id(fd_player_id):
