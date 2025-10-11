@@ -1,5 +1,4 @@
-import requests 
-
+# env\Scripts\activate
 import requests
 import pandas as pd
 import json
@@ -22,62 +21,9 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Supabase connection
-supabase : Client = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
-
-# Cache settings
-CACHE_DIR = "cache"
-TEAM_MAPPING_CACHE = os.path.join(CACHE_DIR, "team_mapping.json")
-PLAYER_MAPPING_CACHE = os.path.join(CACHE_DIR, "player_mapping.json")
-FPL_DATA_CACHE = os.path.join(CACHE_DIR, "fpl_data.json")
-CACHE_DURATION_HOURS = 24  # Cache data for 24 hours
-
-# Create cache directory if it doesn't exist
-if not os.path.exists(CACHE_DIR):
-    os.makedirs(CACHE_DIR)
-
 
 if API_KEY is None:
     raise ValueError("API Key not found. Ensure you have a .env file.")
-
-# Cache utility functions
-def save_to_cache(data, cache_file):
-    """Save data to cache with timestamp"""
-    cache_data = {
-        'timestamp': datetime.now().isoformat(),
-        'data': data
-    }
-    with open(cache_file, 'w') as f:
-        json.dump(cache_data, f)
-    print(f"Data cached to {cache_file}")
-
-def load_from_cache(cache_file, max_age_hours=CACHE_DURATION_HOURS):
-    """Load data from cache if it's still fresh"""
-    if not os.path.exists(cache_file):
-        return None
-    
-    try:
-        with open(cache_file, 'r') as f:
-            cache_data = json.load(f)
-        
-        # Check if cache is still valid
-        cache_time = datetime.fromisoformat(cache_data['timestamp'])
-        if datetime.now() - cache_time < timedelta(hours=max_age_hours):
-            print(f"Loading fresh data from cache: {cache_file}")
-            return cache_data['data']
-        else:
-            print(f"Cache expired for {cache_file}")
-            return None
-    except Exception as e:
-        print(f"Error reading cache {cache_file}: {e}")
-        return None
-
-def is_cache_valid(cache_file, max_age_hours=CACHE_DURATION_HOURS):
-    """Check if cache file exists and is still valid"""
-    return load_from_cache(cache_file, max_age_hours) is not None
 
 # Database helper functions
 def save_teams_to_db(teams_data):
@@ -183,6 +129,210 @@ def save_player_mapping_to_db(fd_player_id, fpl_player_id):
         return result.data
     except Exception as e:
         print(f"Error saving player mapping to database: {e}")
+        return None
+
+# Gameweek and FPL data functions
+def get_current_gameweek():
+    """Get current gameweek from database"""
+    try:
+        result = supabase.table('current_season').select('*').eq('is_active', True).execute()
+        
+        if result.data:
+            # If multiple rows exist, clean up and keep only one
+            if len(result.data) > 1:
+                print(f"Found {len(result.data)} current season rows, cleaning up...")
+                # Delete all rows first
+                supabase.table('current_season').delete().gte('id', 0).execute()
+                # Insert one correct row
+                supabase.table('current_season').upsert({
+                    'season': '2025-26',
+                    'current_gameweek': 1,
+                    'is_active': True
+                }).execute()
+                return {'season': '2025-26', 'current_gameweek': 1, 'is_active': True}
+            else:
+                return result.data[0]
+        return None
+    except Exception as e:
+        print(f"Error getting current gameweek: {e}")
+        return None
+
+def save_current_gameweek(season, gameweek_number):
+    """Save or update current gameweek"""
+    try:
+        result = supabase.table('current_season').upsert({
+            'season': season,
+            'current_gameweek': gameweek_number,
+            'is_active': True,
+            'updated_at': datetime.now().isoformat()
+        }).execute()
+        return result.data
+    except Exception as e:
+        print(f"Error saving current gameweek: {e}")
+        return None
+
+def save_gameweek_info(gameweek_data):
+    """Save gameweek information to database"""
+    try:
+        for gw in gameweek_data:
+            result = supabase.table('gameweeks').upsert({
+                'gameweek_number': gw['id'],
+                'season': '2025-26',
+                'name': gw.get('name', f"Gameweek {gw['id']}"),
+                'deadline_time': gw.get('deadline_time'),
+                'is_finished': gw.get('finished', False),
+                'is_current': gw.get('is_current', False),
+                'average_entry_score': gw.get('average_entry_score', 0),
+                'highest_score': gw.get('highest_score', 0)
+            }, on_conflict='gameweek_number,season').execute()
+        print(f"Saved {len(gameweek_data)} gameweeks to database")
+    except Exception as e:
+        print(f"Error saving gameweeks: {e}")
+
+def save_current_player_stats(players_data, current_gameweek_id):
+    """Save current player statistics to database"""
+    try:
+        saved_count = 0
+        for player in players_data:
+            # Get player database ID
+            player_result = supabase.table('players').select('id').eq('fpl_player_id', player['id']).execute()
+            if not player_result.data:
+                continue
+                
+            player_db_id = player_result.data[0]['id']
+            
+            # Save current stats
+            result = supabase.table('current_player_stats').upsert({
+                'player_id': player_db_id,
+                'gameweek_id': current_gameweek_id,
+                'total_points': player.get('total_points', 0),
+                'minutes': player.get('minutes', 0),
+                'goals_scored': player.get('goals_scored', 0),
+                'assists': player.get('assists', 0),
+                'clean_sheets': player.get('clean_sheets', 0),
+                'goals_conceded': player.get('goals_conceded', 0),
+                'own_goals': player.get('own_goals', 0),
+                'penalties_saved': player.get('penalties_saved', 0),
+                'penalties_missed': player.get('penalties_missed', 0),
+                'yellow_cards': player.get('yellow_cards', 0),
+                'red_cards': player.get('red_cards', 0),
+                'saves': player.get('saves', 0),
+                'bonus': player.get('bonus', 0),
+                'bps': player.get('bps', 0),
+                'influence': float(player.get('influence', 0)),
+                'creativity': float(player.get('creativity', 0)),
+                'threat': float(player.get('threat', 0)),
+                'ict_index': float(player.get('ict_index', 0)),
+                'now_cost': player.get('now_cost', 50),
+                'selected_by_percent': float(player.get('selected_by_percent', 0)),
+                'transfers_in': player.get('transfers_in', 0),
+                'transfers_out': player.get('transfers_out', 0),
+                'form': float(player.get('form', 0)),
+                'points_per_game': float(player.get('points_per_game', 0)),
+                'status': player.get('status', 'a'),
+                'news': player.get('news', ''),
+                'chance_of_playing_this_round': player.get('chance_of_playing_this_round'),
+                'chance_of_playing_next_round': player.get('chance_of_playing_next_round'),
+                'data_updated_at': datetime.now().isoformat()
+            }, on_conflict='player_id,gameweek_id').execute()
+            saved_count += 1
+            
+        print(f"Saved current stats for {saved_count} players")
+    except Exception as e:
+        print(f"Error saving player stats: {e}")
+
+def get_fpl_data_from_db():
+    """Get FPL data from database instead of API/cache"""
+    try:
+        # Get current gameweek
+        current_gw = get_current_gameweek()
+        if not current_gw:
+            return None
+            
+        # Get teams
+        teams_result = supabase.table('teams').select('*').execute()
+        teams = []
+        for team in teams_result.data:
+            teams.append({
+                'id': team['fpl_team_id'],
+                'name': team['name'],
+                'short_name': team['short_name'],
+                'code': team.get('code')
+            })
+        
+        # Get players with current stats
+        players_query = """
+        SELECT 
+            p.fpl_player_id as id,
+            p.first_name,
+            p.second_name, 
+            p.web_name,
+            p.team_id,
+            p.element_type,
+            p.status,
+            t.fpl_team_id as team,
+            COALESCE(cps.total_points, 0) as total_points,
+            COALESCE(cps.minutes, 0) as minutes,
+            COALESCE(cps.goals_scored, 0) as goals_scored,
+            COALESCE(cps.assists, 0) as assists,
+            COALESCE(cps.clean_sheets, 0) as clean_sheets,
+            COALESCE(cps.now_cost, 50) as now_cost,
+            COALESCE(cps.selected_by_percent, 0) as selected_by_percent,
+            COALESCE(cps.form, 0) as form,
+            COALESCE(cps.points_per_game, 0) as points_per_game
+        FROM players p
+        JOIN teams t ON p.team_id = t.id
+        LEFT JOIN current_player_stats cps ON p.id = cps.player_id
+        ORDER BY p.fpl_player_id
+        """
+        
+        # Use simpler approach without complex SQL
+        players_result = None
+        
+        if not players_result:
+            # Fallback: get basic player data
+            players_result = supabase.table('players').select(
+                'fpl_player_id, first_name, second_name, web_name, element_type, status, teams!inner(fpl_team_id)'
+            ).execute()
+            
+            players = []
+            for player in players_result.data:
+                players.append({
+                    'id': player['fpl_player_id'],
+                    'first_name': player['first_name'],
+                    'second_name': player['second_name'],
+                    'web_name': player['web_name'],
+                    'team': player['teams']['fpl_team_id'],
+                    'element_type': player['element_type'],
+                    'status': player['status'],
+                    'total_points': 0,
+                    'now_cost': 50,
+                    'selected_by_percent': '0.0'
+                })
+        else:
+            players = players_result.data
+        
+        # Get gameweeks
+        gameweeks_result = supabase.table('gameweeks').select('*').eq('season', current_gw['season']).order('gameweek_number').execute()
+        gameweeks = []
+        for gw in gameweeks_result.data:
+            gameweeks.append({
+                'id': gw['gameweek_number'],
+                'name': gw['name'],
+                'deadline_time': gw['deadline_time'],
+                'finished': gw['is_finished'],
+                'is_current': gw['is_current']
+            })
+        
+        return {
+            'teams': teams,
+            'elements': players,
+            'events': gameweeks,
+            'total_players': len(players)
+        }
+        
+    except Exception as e:
+        print(f"Error getting FPL data from database: {e}")
         return None
 
 # Team information
@@ -308,11 +458,18 @@ def create_player_mapping():
     
     # Try to load existing mapping from database first
     existing_mapping = get_player_mapping_from_db()
-    if existing_mapping:
+    
+    # Check if we have sufficient mappings (at least 200 players should be mapped)
+    # With 20 Premier League teams ~25 players each = ~500 total, so 200+ is reasonable coverage
+    if existing_mapping and len(existing_mapping) >= 200:
         print(f"Loading existing player mapping from database: {len(existing_mapping)} players")
         return existing_mapping
+    elif existing_mapping:
+        print(f"Found {len(existing_mapping)} existing mappings, but need more. Building fresh mapping...")
+    else:
+        print("No existing player mappings found. Building fresh player mapping from APIs and saving to database...")
     
-    print("Building fresh player mapping from APIs and saving to database...")
+    print("This will take ~20 minutes due to API rate limits but only needs to be done once.")
     
     # Get player data from FPL bootstrap (contains all players)
     fplResponse = requests.get(urlFantasy)
@@ -553,19 +710,51 @@ if PLAYER_MAPPING:
         print(f"Sample player: {sample_data['player_name']} from {sample_data['team_name']}")
 
 def get_cached_fpl_data():
-    """Get FPL data with caching to reduce API calls"""
-    cached_data = load_from_cache(FPL_DATA_CACHE, max_age_hours=6)  # Refresh every 6 hours
-    if cached_data is not None:
-        return cached_data
+    """Get FPL data from database or fetch fresh from API if needed"""
     
-    print("Fetching fresh FPL data...")
+    # Try to get data from database first
+    db_data = get_fpl_data_from_db()
+    if db_data and db_data.get('elements'):
+        print(f"Loading FPL data from database: {len(db_data['elements'])} players")
+        return db_data
+    
+    print("Fetching fresh FPL data from API and saving to database...")
     response = requests.get(urlFantasy)
-    if response.status_code == 200:
-        data = response.json()
-        save_to_cache(data, FPL_DATA_CACHE)
-        return data
-    else:
+    if response.status_code != 200:
         raise Exception(f"Failed to get FPL data: {response.status_code}")
+    
+    data = response.json()
+    
+    # Save to database
+    try:
+        # Save gameweek info
+        if 'events' in data:
+            save_gameweek_info(data['events'])
+        
+        # Find current gameweek
+        current_gameweek = None
+        if 'events' in data:
+            for event in data['events']:
+                if event.get('is_current', False):
+                    current_gameweek = event['id']
+                    save_current_gameweek('2025-26', current_gameweek)
+                    break
+        
+        # Save current player stats
+        if 'elements' in data and current_gameweek:
+            # Get gameweek database ID
+            gw_result = supabase.table('gameweeks').select('id').eq('gameweek_number', current_gameweek).eq('season', '2025-26').execute()
+            if gw_result.data:
+                gameweek_db_id = gw_result.data[0]['id']
+                save_current_player_stats(data['elements'], gameweek_db_id)
+        
+        print("Successfully saved FPL data to database")
+        
+    except Exception as e:
+        print(f"Warning: Could not save to database: {e}")
+        print("Continuing with API data...")
+    
+    return data
 
 def process_match_data():
     """
