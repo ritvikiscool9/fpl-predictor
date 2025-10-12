@@ -8,3 +8,6 @@ venv/
 # Ignore cache files (contains API data that expires)
 cache/
 *.json
+
+# Ignore README.md
+README.md
