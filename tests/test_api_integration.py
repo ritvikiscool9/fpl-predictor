@@ -10,8 +10,11 @@ import requests
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fpl_predictor import process_match_data, get_cached_fpl_data
-from populate_db import populate_fresh_fpl_data
+# Mock Supabase before importing modules that use it
+with patch('supabase.create_client'):
+    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test'}):
+        from fpl_predictor import process_match_data, get_cached_fpl_data
+        from populate_db import populate_fresh_fpl_data
 
 
 class TestAPIIntegration:

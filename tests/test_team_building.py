@@ -9,11 +9,14 @@ from unittest.mock import patch, Mock
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fpl_predictor import (
-    build_optimal_team,
-    generate_transfer_recommendations,
-    get_best_players_by_position
-)
+# Mock Supabase before importing modules that use it
+with patch('supabase.create_client'):
+    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test'}):
+        from fpl_predictor import (
+            build_optimal_team,
+            generate_transfer_recommendations,
+            get_best_players_by_position
+        )
 
 
 class TestTeamBuilding:

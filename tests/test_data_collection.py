@@ -10,11 +10,14 @@ import pandas as pd
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data_collector import (
-    collect_season_gameweeks,
-    validate_collected_data,
-    analyze_data_quality
-)
+# Mock Supabase before importing modules that use it
+with patch('supabase.create_client'):
+    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test'}):
+        from data_collector import (
+            collect_season_gameweeks,
+            validate_collected_data,
+            analyze_data_quality
+        )
 
 
 class TestDataCollection:

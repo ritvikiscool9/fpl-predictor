@@ -4,9 +4,14 @@ Test fixtures and common test data
 import pytest
 import sys
 import os
+from unittest.mock import patch
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Setup test environment
+from tests.test_env import setup_test_environment
+setup_test_environment()
 
 
 @pytest.fixture

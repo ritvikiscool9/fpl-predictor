@@ -4,16 +4,20 @@ Test utility functions and player prediction logic
 import pytest
 import sys
 import os
+from unittest.mock import patch
 
 # Add the parent directory to the path to import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fpl_predictor import (
-    calculate_player_form_score,
-    calculate_fixture_favorability,
-    calculate_team_strength_score,
-    predict_player_points,
-)
+# Mock Supabase before importing modules that use it
+with patch('supabase.create_client'):
+    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test'}):
+        from fpl_predictor import (
+            calculate_player_form_score,
+            calculate_fixture_favorability,
+            calculate_team_strength_score,
+            predict_player_points,
+        )
 
 
 class TestPlayerFormScore:
