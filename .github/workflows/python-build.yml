@@ -33,8 +33,22 @@ jobs:
           pip install flake8 
           flake8 *.py --max-line-length=120 --ignore=W291,W293,F401,F541,E501,E203,F841,E226,F402,W503 --exclude=env,venv,.venv,node_modules
 
-      # Run tests (when tests/ directory exists)
-      # - name: Run tests with pytest
-      #   run: |
-      #     pip install pytest
-      #     pytest tests/ --maxfail=1 --disable-warnings -q
+      # Security scan for vulnerabilities
+      - name: Run security scan with bandit
+        run: |
+          pip install bandit
+          bandit -r . --exclude ./env,./venv,./.venv --format json --output bandit-report.json || true
+          bandit -r . --exclude ./env,./venv,./.venv || true
+
+      # Dependency vulnerability scan
+      - name: Run safety check
+        run: |
+          pip install safety
+          safety check --json --output safety-report.json || true
+          safety check || true
+
+      # Run tests
+      - name: Run tests with pytest
+        run: |
+          pip install pytest pytest-mock
+          pytest tests/ --maxfail=3 --disable-warnings -v

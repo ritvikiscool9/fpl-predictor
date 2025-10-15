@@ -9,5 +9,3 @@ venv/
 cache/
 *.json
 
-# Ignore README.md
-README.md
