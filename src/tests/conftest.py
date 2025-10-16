@@ -6,11 +6,15 @@ import sys
 import os
 from unittest.mock import patch
 
-# Add the parent directory to the path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the parent directories to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.dirname(current_dir)
+root_dir = os.path.dirname(src_dir)
+sys.path.insert(0, src_dir)
+sys.path.insert(0, root_dir)
 
 # Setup test environment
-from tests.test_env import setup_test_environment
+from test_env import setup_test_environment
 setup_test_environment()
 
 

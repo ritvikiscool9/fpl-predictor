@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Mock Supabase before importing modules that use it
 with patch('supabase.create_client'):
-    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test'}):
+    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test', 'API_KEY': 'test_api'}):
         from populate_db import populate_fresh_fpl_data
 
 

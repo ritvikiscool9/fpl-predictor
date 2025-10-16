@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Mock Supabase before importing modules that use it
 with patch('supabase.create_client'):
-    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test'}):
+    with patch.dict(os.environ, {'SUPABASE_URL': 'test', 'SUPABASE_KEY': 'test', 'API_KEY': 'test_api'}):
         from fpl_predictor import process_match_data, get_cached_fpl_data
         from populate_db import populate_fresh_fpl_data
 
@@ -66,7 +66,7 @@ class TestErrorScenarios:
 
     def test_malformed_player_data(self):
         """Test handling of malformed player data"""
-        from fpl_predictor import calculate_player_form_score
+        from src.fpl_predictor import calculate_player_form_score
         
         # Missing required fields
         malformed_player = {"id": 1}  # Missing total_points, minutes, element_type
@@ -77,7 +77,7 @@ class TestErrorScenarios:
 
     def test_negative_values_handling(self):
         """Test handling of negative values in data"""
-        from fpl_predictor import calculate_player_form_score
+        from src.fpl_predictor import calculate_player_form_score
         
         negative_player = {
             "total_points": -10,  # Negative points
@@ -90,7 +90,7 @@ class TestErrorScenarios:
 
     def test_extreme_values(self):
         """Test handling of extreme values"""
-        from fpl_predictor import calculate_player_form_score
+        from src.fpl_predictor import calculate_player_form_score
         
         extreme_player = {
             "total_points": 999999,  # Extremely high points
@@ -107,7 +107,7 @@ class TestDataValidation:
 
     def test_position_validation(self):
         """Test that positions are within valid range"""
-        from fpl_predictor import calculate_player_form_score
+        from src.fpl_predictor import calculate_player_form_score
         
         for position in [1, 2, 3, 4]:  # Valid positions
             player = {
@@ -120,7 +120,7 @@ class TestDataValidation:
 
     def test_invalid_position(self):
         """Test handling of invalid positions"""
-        from fpl_predictor import calculate_player_form_score
+        from src.fpl_predictor import calculate_player_form_score
         
         invalid_player = {
             "total_points": 50,
@@ -134,7 +134,7 @@ class TestDataValidation:
 
     def test_budget_constraints(self):
         """Test that team building respects budget constraints"""
-        from fpl_predictor import build_optimal_team
+        from src.fpl_predictor import build_optimal_team
         
         # Mock data with expensive players
         expensive_match_data = {
@@ -172,7 +172,7 @@ class TestPerformance:
     def test_prediction_speed(self):
         """Test that predictions complete in reasonable time"""
         import time
-        from fpl_predictor import predict_player_points
+        from src.fpl_predictor import predict_player_points
         
         player = {
             "id": 1,
@@ -201,7 +201,7 @@ class TestPerformance:
 
     def test_large_dataset_handling(self):
         """Test handling of large player datasets"""
-        from fpl_predictor import build_optimal_team
+        from src.fpl_predictor import build_optimal_team
         
         # Create dataset with many players
         large_elements = []
