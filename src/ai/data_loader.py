@@ -42,13 +42,13 @@ class FPLDataLoader:
             print(f"Error loading player data: {e}")
             return pd.DataFrame()
     
-    def load_current_player_data(self) -> pd.DateFrame:
+    def load_current_player_data(self) -> pd.DataFrame:
         """Load current player performance data"""
         try: 
             response = self.supabase.table("current_player_stats")
 
             if response.data:
-                df = pd.DateFrame(response.data)
+                df = pd.DataFrame(response.data)
                 print("loaded data")
                 return df
             else:
@@ -61,7 +61,7 @@ class FPLDataLoader:
     # def load_player_performance(self) -> pd.DataFrame: 
     #     """Load player gameweek performances"""
 
-    def load_fixture_data(self) -> pd.DataFrame():
+    def load_fixture_data(self) -> pd.DataFrame:
         """Load fixture data"""
         try:
             response = self.supabase.table("fixtures").select("*").execute

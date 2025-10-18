@@ -49,5 +49,10 @@ jobs:
 
       # Run tests
       - name: Run tests
+        env:
+          SUPABASE_URL: "https://test.supabase.co"
+          SUPABASE_KEY: "test_key"
+          API_KEY: "test_api_key"
         run: |
-          pytest src/tests/ --tb=short -v
+          pip install pytest pytest-mock
+          pytest src/tests/ --maxfail=3 --disable-warnings -v
