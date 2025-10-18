@@ -48,11 +48,6 @@ jobs:
           safety check || true
 
       # Run tests
-      - name: Run tests with pytest
-        env:
-          SUPABASE_URL: "https://test.supabase.co"
-          SUPABASE_KEY: "test_key"
-          API_KEY: "test_api_key"
+      - name: Run tests
         run: |
-          pip install pytest pytest-mock
-          pytest src/tests/ --maxfail=3 --disable-warnings -v
+          pytest src/tests/ --tb=short -v
