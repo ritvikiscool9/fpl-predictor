@@ -104,7 +104,7 @@ class FPLDataLoader:
             return False
 
     def explore_data_structure(self):
-        """Explore the data """
+        """Explore the data"""
         print(" Exploring data ...")
 
         tables = [
@@ -152,7 +152,9 @@ class FPLDataLoader:
             print(f"Error loading teams: {e}")
             return pd.DataFrame()
 
-    def get_training_data(self, seasons: List[str] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_training_data(
+        self, seasons: List[str] = None
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Get features (X) and target (y) for training by combining tables"""
         try:
             print(" Preparing training data from existing tables")
@@ -169,8 +171,12 @@ class FPLDataLoader:
 
             # Filter by seasons if specified
             if seasons and "season" in historical_data.columns:
-                historical_data = historical_data[historical_data["season"].isin(seasons)]
-                print(f" Filtered to {len(historical_data)} records for seasons: {seasons}")
+                historical_data = historical_data[
+                    historical_data["season"].isin(seasons)
+                ]
+                print(
+                    f" Filtered to {len(historical_data)} records for seasons: {seasons}"
+                )
 
             # Try to merge with team data if available
             try:
