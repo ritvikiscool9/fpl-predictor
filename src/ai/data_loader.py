@@ -25,7 +25,6 @@ class FPLDataLoader:
 
         self.supabase = create_client(supabase_url, supabase_key)
 
-
     def load_current_player_data(self) -> pd.DataFrame:
         """Load current player performance data"""
         try:
