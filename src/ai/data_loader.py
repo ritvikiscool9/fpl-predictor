@@ -28,7 +28,7 @@ class FPLDataLoader:
     def load_current_player_data(self) -> pd.DataFrame:
         """Load current player performance data"""
         try:
-            response = self.supabase.table("current_player_stats")
+            response = self.supabase.table("current_player_stats").select("*").execute()
 
             if response.data:
                 df = pd.DataFrame(response.data)
@@ -63,7 +63,7 @@ class FPLDataLoader:
     def load_fixture_data(self) -> pd.DataFrame:
         """Load fixture data"""
         try:
-            response = self.supabase.table("fixtures").select("*").execute
+            response = self.supabase.table("fixtures").select("*").execute()
 
             if response.data:
                 df = pd.DataFrame(response.data)
@@ -79,7 +79,7 @@ class FPLDataLoader:
     def test_connection(self):
         """Test supabase connection"""
         try:
-            response = self.supabase.table("players").select("*").execute
+            response = self.supabase.table("players").select("*").limit(1).execute()
             print("connected to supabase")
             return True
         except Exception as e:
