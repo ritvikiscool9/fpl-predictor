@@ -154,21 +154,6 @@ class FPLDataLoader:
             except Exception as e:
                 print(f"\n{table_name}: Error - {e}")
 
-    def load_teams_data(self) -> pd.DataFrame:
-        """Load teams data"""
-        try:
-            response = self.supabase.table("teams").select("*").execute()
-            if response.data:
-                df = pd.DataFrame(response.data)
-                print(f"Loaded {len(df)} teams")
-                return df
-            else:
-                print("No teams found")
-                return pd.DataFrame()
-        except Exception as e:
-            print(f"Error loading teams: {e}")
-            return pd.DataFrame()
-
     def get_training_data(
         self, seasons: List[str] = None
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:

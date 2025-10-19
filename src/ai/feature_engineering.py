@@ -94,7 +94,7 @@ class FPLFeatureEngineering:
             # If we have gameweek and team info, calculate real difficulty
             if "gameweek_id" in df.columns and "team_id" in df.columns:
                 # Get upcoming fixtures for each team/gameweek combination
-                upcoming_fixtures = fixtures[fixtures["finished"] == False]
+                upcoming_fixtures = fixtures[~fixtures["finished"]]
 
                 # Merge to get opponent strength
                 fixture_difficulty = []
