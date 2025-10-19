@@ -25,22 +25,6 @@ class FPLDataLoader:
 
         self.supabase = create_client(supabase_url, supabase_key)
 
-    def load_player_data(self) -> pd.DataFrame:
-        """Load historical player performance data"""
-        try:
-            response = self.supabase.table("historical_player_stats")
-
-            if response.data:
-                df = pd.DataFrame(response.data)
-                print("loaded data")
-                return df
-            else:
-                print("no data found")
-                return pd.DataFrame()
-
-        except Exception as e:
-            print(f"Error loading player data: {e}")
-            return pd.DataFrame()
 
     def load_current_player_data(self) -> pd.DataFrame:
         """Load current player performance data"""
