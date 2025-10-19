@@ -67,13 +67,47 @@ class FPLDataLoader:
 
             if response.data:
                 df = pd.DataFrame(response.data)
-                print(f"loaded {len(df)} fixtures")
+                print(f"✅ Loaded {len(df)} fixtures")
                 return df
             else:
-                print("no fixtures loaded")
+                print("No fixtures found")
                 return pd.DataFrame()
         except Exception as e:
-            print(f"Error loading player data: {e}")
+            print(f"Error loading fixtures: {e}")
+            return pd.DataFrame()
+
+    def load_teams_data(self) -> pd.DataFrame:
+        """Load teams data"""
+        try:
+            response = self.supabase.table("teams").select("*").execute()
+
+            if response.data:
+                df = pd.DataFrame(response.data)
+                print(f"✅ Loaded {len(df)} teams")
+                return df
+            else:
+                print("No teams found")
+                return pd.DataFrame()
+
+        except Exception as e:
+            print(f"Error loading teams: {e}")
+            return pd.DataFrame()
+
+    def load_current_team_stats(self) -> pd.DataFrame:
+        """Load current team statistics"""
+        try:
+            response = self.supabase.table("current_team_stats").select("*").execute()
+
+            if response.data:
+                df = pd.DataFrame(response.data)
+                print(f"✅ Loaded {len(df)} team stats records")
+                return df
+            else:
+                print("No team stats found")
+                return pd.DataFrame()
+
+        except Exception as e:
+            print(f"Error loading team stats: {e}")
             return pd.DataFrame()
 
     def test_connection(self):
