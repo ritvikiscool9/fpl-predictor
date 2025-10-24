@@ -1,3 +1,6 @@
+# To enter Python virtual environemnt 
+env\Scripts\activate
+
 # FPL Predictor AI Development Guide
 
 Personal reference for implementing AI system to analyze FPL database and generate optimal teams.
