@@ -23,7 +23,7 @@ class PlayerPointsPredictor:
         self.is_trained = False
 
     def prepare_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Prepare features for prediciting"""
+        """Prepare features for predicting"""
 
         # Base features
         base_features = [
@@ -47,14 +47,14 @@ class PlayerPointsPredictor:
             "fixture_difficulty",
         ]
 
-        # Select avaible features
+        # Select available features
         all_features = base_features + engineered_features
         available_features = [col for col in all_features if col in df.columns]
 
         features = df[available_features].fillna(0)
         self.feature_columns = available_features
 
-        print(f"Using {len(available_features)} for training")
+        print(f"Using {len(available_features)} features for training")
 
         return features
 
@@ -77,7 +77,7 @@ class PlayerPointsPredictor:
         self.model.fit(X_train, y_train)
         self.is_trained = True
 
-        # Evalute
+        # Evaluate
         y_pred = self.model.predict(X_test)
 
         metrics = {
