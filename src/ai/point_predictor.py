@@ -1,5 +1,4 @@
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import pandas as pd
@@ -17,8 +16,8 @@ class PlayerPointsPredictor:
     """Predict points for individual players"""
 
     def __init__(self):
-        self.model = GradientBoostingRegressor(
-            n_estimators=100, learning_rate=0.1, max_depth=6, random_state=42
+        self.model = RandomForestRegressor(
+            n_estimators=100, max_depth=6, random_state=42, n_jobs=-1
         )
         self.feature_columns = []
         self.is_trained = False
