@@ -31,3 +31,22 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Model files
+*.pkl
+*.joblib
+models/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+*.log

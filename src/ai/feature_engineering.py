@@ -23,42 +23,56 @@ class FPLFeatureEngineering:
         features = df.copy()
 
         if "fpl_player_id" in df.columns:
-            features["points_last_3"] = (
-                df.groupby("fpl_player_id")["total_points"]
-                .rolling(3, min_periods=1)
-                .mean()
-                .reset_index(level=0, drop=True)
-            )
+            # Historical averages
+            for stat in ["goals_scored", "assists", "clean_sheets", "minutes", "saves"]:
+                if stat in df.columns:
+                    # Historical average (exclude current gameweek)
+                    features[f"{stat}_avg_last_5"] = (
+                        df.groupby("fpl_player_id")[stat]
+                        .shift(1)  # Exclude current gameweek
+                        .rolling(5, min_periods=1)
+                        .mean()
+                        .reset_index(level=0, drop=True)
+                        .fillna(0)
+                    )
 
-            features["points_last_5"] = (
-                df.groupby("fpl_player_id")["total_points"]
-                .rolling(5, min_periods=1)
-                .mean()
-                .reset_index(level=0, drop=True)
-            )
+        # Current rolling features (already fixed)
+        features["points_last_3"] = (
+            df.groupby("fpl_player_id")["total_points"]
+            .shift(1)
+            .rolling(3, min_periods=1)
+            .mean()
+            .reset_index(level=0, drop=True)
+            .fillna(0)
+        )
 
-            # Minutes consistency
-            features["minutes_last_3"] = (
-                df.groupby("fpl_player_id")["minutes"]
-                .rolling(3, min_periods=1)
-                .mean()
-                .reset_index(level=0, drop=True)
-            )
+        features["points_last_5"] = (
+            df.groupby("fpl_player_id")["total_points"]
+            .shift(1)
+            .rolling(5, min_periods=1)
+            .mean()
+            .reset_index(level=0, drop=True)
+            .fillna(0)
+        )
+
+        features["minutes_last_3"] = (
+            df.groupby("fpl_player_id")["minutes"]
+            .shift(1)
+            .rolling(3, min_periods=1)
+            .mean()
+            .reset_index(level=0, drop=True)
+            .fillna(0)
+        )
 
         # Form trend
         features["form_trend"] = self.calculate_form_trend(df)
 
-        # Value features
-        if "total_points" in df.columns and "value" in df.columns:
-            features["points_per_million"] = df["total_points"] / (df["value"] / 10)
-
-        # Defensive vs attacking players
+        # Position features
         if "element_type" in df.columns:
             features["is_defender"] = (df["element_type"] == 2).astype(int)
             features["is_midfielder"] = (df["element_type"] == 3).astype(int)
             features["is_attacker"] = (df["element_type"] == 4).astype(int)
         else:
-            # Default values if element_type column doesn't exist
             features["is_defender"] = 0
             features["is_midfielder"] = 0
             features["is_attacker"] = 0
@@ -66,12 +80,13 @@ class FPLFeatureEngineering:
         return features
 
     def calculate_form_trend(self, df: pd.DataFrame) -> pd.Series:
-        """Calcualte if player is improving or not"""
+        """Calculate if player is improving or not"""
         if "fpl_player_id" not in df.columns or "total_points" not in df.columns:
             return pd.Series(0, index=df.index)
 
         return (
             df.groupby("fpl_player_id")["total_points"]
+            .shift(1)
             .rolling(3, min_periods=2)
             .apply(lambda x: 1 if len(x) >= 2 and x.iloc[-1] > x.iloc[0] else 0)
             .reset_index(level=0, drop=True)
