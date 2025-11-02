@@ -1,6 +1,7 @@
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.model_selection import cross_val_score, TimeSeriesSplit
 import pandas as pd
 import numpy as np
 import joblib
@@ -123,6 +124,37 @@ class PlayerPointsPredictor:
         )
         print(f"Model saved to {filepath}")
 
+    def evaluate_with_cv(self, enchanced_data: pd.DataFrame) -> dict:
+        """
+        Evaluate model with proper cross-validation
+        Like testing the model multiple times
+        """
+        X = self.prepare_features(enchanced_data)
+        y = enchanced_data["total_points"]
+
+        # Use TimeSeriesSplit to respect temporal order
+        tscv = TimeSeriesSplit(n_splits=5)
+
+        cv_mae_scores = cross_val_score(
+            self.model, X, y, cv=tscv, scoring="neg_mean_absolute_error"
+        )
+
+        cv_r2_scores = cross_val_score(self.model, X, y, cv=tscv, scoring="r2")
+
+        results = {
+            "cv_mae_mean": -cv_mae_scores.mean(),
+            "cv_mae_std": cv_mae_scores.std(),
+            "cv_r2_mean": cv_r2_scores.mean(),
+            "cv_r2_std": cv_r2_scores.std(),
+            "cv_scores": cv_mae_scores,
+        }
+
+        print(f"\nCross-Validation Results:")
+        print(f"  MAE: {results['cv_mae_mean']:.2f} ± {results['cv_mae_std']:.2f}")
+        print(f"  R²:  {results['cv_r2_mean']:.3f} ± {results['cv_r2_std']:.3f}")
+
+        return results
+
 
 if __name__ == "__main__":
     print("Training FPL Points Predictor")
@@ -147,6 +179,10 @@ if __name__ == "__main__":
         # Train the model
         print("\nTraining AI model...")
         metrics = predictor.train(enhanced_data)
+
+        # Cross-validation evaluation
+        print("\n🔍 Cross-validation evaluation...")
+        cv_metrics = predictor.evaluate_with_cv(enhanced_data)
 
         # Save model
         os.makedirs("models", exist_ok=True)
