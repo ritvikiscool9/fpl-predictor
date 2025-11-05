@@ -42,22 +42,51 @@ class FPLDataLoader:
             return pd.DataFrame()
 
     def load_player_data(self) -> pd.DataFrame:
-        """Load historical player performance data"""
+        """Load historical player data with real names"""
         try:
-            response = (
+            print("🔌 Loading historical player data...")
+
+            # Get historical stats
+            stats_response = (
                 self.supabase.table("historical_player_stats").select("*").execute()
             )
 
-            if response.data:
-                df = pd.DataFrame(response.data)
-                print(f"Loaded {len(df)} historical records")
-                return df
-            else:
-                print("No historical data found")
+            if not stats_response.data:
+                print("⚠️  No historical stats found")
                 return pd.DataFrame()
 
+            stats_df = pd.DataFrame(stats_response.data)
+
+            # Get player information (names, positions)
+            players_response = (
+                self.supabase.table("players")
+                .select(
+                    "fpl_player_id, web_name, first_name, second_name, element_type, team_id"
+                )
+                .execute()
+            )
+
+            if players_response.data:
+                players_df = pd.DataFrame(players_response.data)
+
+                # Merge stats with player info
+                merged_df = stats_df.merge(players_df, on="fpl_player_id", how="left")
+
+                print(f"✅ Loaded {len(merged_df)} records with player names")
+                print(f"📋 Players from {merged_df['season'].unique()} season(s)")
+
+                # Show sample of real players
+                if "web_name" in merged_df.columns:
+                    sample_players = merged_df["web_name"].dropna().unique()[:5]
+                    print(f"👤 Sample players: {list(sample_players)}")
+
+                return merged_df
+            else:
+                print("⚠️  No player info found, using stats only")
+                return stats_df
+
         except Exception as e:
-            print(f"Error loading player data: {e}")
+            print(f"❌ Error loading player data: {e}")
             return pd.DataFrame()
 
     def load_fixture_data(self) -> pd.DataFrame:
