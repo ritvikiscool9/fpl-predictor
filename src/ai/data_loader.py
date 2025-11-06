@@ -112,36 +112,67 @@ class FPLDataLoader:
                 # Merge stats with player info
                 merged_df = stats_df.merge(players_df, on="fpl_player_id", how="left")
 
-                # Get current player prices from current_player_prices table
+                # Get current player prices from latest gameweek in player_performances
                 try:
-                    prices_response = (
-                        self.supabase.table("current_player_prices")
-                        .select("fpl_player_id, now_cost, selected_by_percent")
+                    # Get the latest gameweek
+                    latest_gw_response = (
+                        self.supabase.table("player_performances")
+                        .select("gameweek_id")
+                        .order("gameweek_id", desc=True)
+                        .limit(1)
                         .execute()
                     )
 
-                    if prices_response.data:
-                        prices_df = pd.DataFrame(prices_response.data)
+                    if latest_gw_response.data:
+                        latest_gw = latest_gw_response.data[0]["gameweek_id"]
+                        print(f"INFO: Getting current prices from gameweek {latest_gw}")
 
-                        # Merge with price data
-                        merged_df = merged_df.merge(
-                            prices_df,
-                            on="fpl_player_id",
-                            how="left",
-                            suffixes=("", "_price"),
+                        # Get current prices from latest gameweek
+                        prices_response = (
+                            self.supabase.table("player_performances")
+                            .select("player_id, now_cost, selected_by_percent")
+                            .eq("gameweek_id", latest_gw)
+                            .execute()
                         )
 
-                        # Update the value and selected columns with current prices
-                        if "now_cost" in merged_df.columns:
-                            merged_df["value"] = merged_df["now_cost"]
-                        if "selected_by_percent" in merged_df.columns:
-                            merged_df["selected"] = merged_df["selected_by_percent"]
+                        if prices_response.data:
+                            prices_df = pd.DataFrame(prices_response.data)
 
-                        print(f"SUCCESS: Merged current pricing data for players")
+                            # player_performances.player_id IS the fpl_player_id, so rename for merging
+                            prices_df["fpl_player_id"] = prices_df["player_id"]
+
+                            # Merge with price data
+                            merged_df = merged_df.merge(
+                                prices_df[
+                                    ["fpl_player_id", "now_cost", "selected_by_percent"]
+                                ],
+                                on="fpl_player_id",
+                                how="left",
+                                suffixes=("", "_current"),
+                            )
+
+                            # Update the value and selected columns with current prices
+                            if "now_cost_current" in merged_df.columns:
+                                merged_df["now_cost"] = merged_df["now_cost_current"]
+                                merged_df["value"] = merged_df["now_cost_current"]
+                            if "selected_by_percent_current" in merged_df.columns:
+                                merged_df["selected"] = merged_df[
+                                    "selected_by_percent_current"
+                                ]
+
+                            print(
+                                f"SUCCESS: Merged current pricing data from GW {latest_gw} for players"
+                            )
+                        else:
+                            print(
+                                f"WARNING: No pricing data found for gameweek {latest_gw}"
+                            )
                     else:
-                        print("WARNING: No current pricing data found")
+                        print("WARNING: Could not determine latest gameweek")
                 except Exception as e:
-                    print(f"WARNING: Could not load current prices: {e}")
+                    print(
+                        f"WARNING: Could not load current prices from player_performances: {e}"
+                    )
 
                 print(f"SUCCESS: Loaded {len(merged_df)} records with player names")
 
