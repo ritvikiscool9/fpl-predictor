@@ -21,6 +21,7 @@ def check_existing_data():
         "players",
         "fixtures",
         "current_team_stats",
+        "player_performances",
     ]
 
     for table in tables_to_check:
