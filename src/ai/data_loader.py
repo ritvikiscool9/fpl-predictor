@@ -42,20 +42,60 @@ class FPLDataLoader:
             return pd.DataFrame()
 
     def load_player_data(self) -> pd.DataFrame:
-        """Load historical player data with real names"""
+        """Load current player performance data with real names"""
         try:
-            print("🔌 Loading historical player data...")
+            print("Loading current player performance data...")
 
-            # Get historical stats
-            stats_response = (
-                self.supabase.table("historical_player_stats").select("*").execute()
-            )
+            # Get player performance stats (using pagination to get all records)
+            all_records = []
+            batch_size = 1000
+            offset = 0
 
-            if not stats_response.data:
-                print("⚠️  No historical stats found")
-                return pd.DataFrame()
+            while True:
+                stats_response = (
+                    self.supabase.table("player_performances")
+                    .select("*")
+                    .range(offset, offset + batch_size - 1)
+                    .execute()
+                )
 
-            stats_df = pd.DataFrame(stats_response.data)
+                if not stats_response.data or len(stats_response.data) == 0:
+                    break
+
+                all_records.extend(stats_response.data)
+                offset += batch_size
+
+                # Safety limit
+                if offset > 10000:
+                    break
+
+            if not all_records:
+                # Fallback to historical_player_stats if no current data
+                stats_response = (
+                    self.supabase.table("historical_player_stats").select("*").execute()
+                )
+
+                if not stats_response.data:
+                    print("WARNING: No performance data found")
+                    return pd.DataFrame()
+                all_records = stats_response.data
+
+            stats_df = pd.DataFrame(all_records)
+            print(f"SUCCESS: Loaded {len(stats_df)} performance records")
+
+            # Map column names to match expected format
+            if "player_id" in stats_df.columns:
+                stats_df["fpl_player_id"] = stats_df["player_id"]
+            if "gameweek_id" in stats_df.columns:
+                stats_df["gameweek"] = stats_df["gameweek_id"]
+            if "now_cost" in stats_df.columns:
+                stats_df["value"] = stats_df["now_cost"]
+            if "selected_by_percent" in stats_df.columns:
+                stats_df["selected"] = stats_df["selected_by_percent"]
+
+            # Add season column if missing (current season)
+            if "season" not in stats_df.columns:
+                stats_df["season"] = "2024-25"
 
             # Get player information (names, positions)
             players_response = (
@@ -72,21 +112,59 @@ class FPLDataLoader:
                 # Merge stats with player info
                 merged_df = stats_df.merge(players_df, on="fpl_player_id", how="left")
 
-                print(f"✅ Loaded {len(merged_df)} records with player names")
-                print(f"📋 Players from {merged_df['season'].unique()} season(s)")
+                # Get current player prices from current_player_prices table
+                try:
+                    prices_response = (
+                        self.supabase.table("current_player_prices")
+                        .select("fpl_player_id, now_cost, selected_by_percent")
+                        .execute()
+                    )
+
+                    if prices_response.data:
+                        prices_df = pd.DataFrame(prices_response.data)
+
+                        # Merge with price data
+                        merged_df = merged_df.merge(
+                            prices_df,
+                            on="fpl_player_id",
+                            how="left",
+                            suffixes=("", "_price"),
+                        )
+
+                        # Update the value and selected columns with current prices
+                        if "now_cost" in merged_df.columns:
+                            merged_df["value"] = merged_df["now_cost"]
+                        if "selected_by_percent" in merged_df.columns:
+                            merged_df["selected"] = merged_df["selected_by_percent"]
+
+                        print(f"SUCCESS: Merged current pricing data for players")
+                    else:
+                        print("WARNING: No current pricing data found")
+                except Exception as e:
+                    print(f"WARNING: Could not load current prices: {e}")
+
+                print(f"SUCCESS: Loaded {len(merged_df)} records with player names")
+
+                # Handle season column if it exists
+                if "season" in merged_df.columns:
+                    print(
+                        f"INFO: Players from {merged_df['season'].unique()} season(s)"
+                    )
+                else:
+                    print("INFO: Using current season player performance data")
 
                 # Show sample of real players
                 if "web_name" in merged_df.columns:
                     sample_players = merged_df["web_name"].dropna().unique()[:5]
-                    print(f"👤 Sample players: {list(sample_players)}")
+                    print(f"INFO: Sample players: {list(sample_players)}")
 
                 return merged_df
             else:
-                print("⚠️  No player info found, using stats only")
+                print("WARNING: No player info found, using stats only")
                 return stats_df
 
         except Exception as e:
-            print(f"❌ Error loading player data: {e}")
+            print(f"ERROR: Error loading player data: {e}")
             return pd.DataFrame()
 
     def load_fixture_data(self) -> pd.DataFrame:
@@ -96,7 +174,7 @@ class FPLDataLoader:
 
             if response.data:
                 df = pd.DataFrame(response.data)
-                print(f"✅ Loaded {len(df)} fixtures")
+                print(f"SUCCESS: Loaded {len(df)} fixtures")
                 return df
             else:
                 print("No fixtures found")
@@ -112,7 +190,7 @@ class FPLDataLoader:
 
             if response.data:
                 df = pd.DataFrame(response.data)
-                print(f"✅ Loaded {len(df)} teams")
+                print(f"SUCCESS: Loaded {len(df)} teams")
                 return df
             else:
                 print("No teams found")
@@ -129,7 +207,7 @@ class FPLDataLoader:
 
             if response.data:
                 df = pd.DataFrame(response.data)
-                print(f"✅ Loaded {len(df)} team stats records")
+                print(f"SUCCESS: Loaded {len(df)} team stats records")
                 return df
             else:
                 print("No team stats found")
@@ -328,7 +406,7 @@ if __name__ == "__main__":
         X, y = loader.get_training_data()
         if not X.empty and not y.empty:
             print(
-                f"✅ Training data ready: {X.shape[0]} samples, {X.shape[1]} features"
+                f"SUCCESS: Training data ready: {X.shape[0]} samples, {X.shape[1]} features"
             )
             print(f"Features: {list(X.columns)}")
             print(f"Target stats: min={y.min()}, max={y.max()}, mean={y.mean():.2f}")

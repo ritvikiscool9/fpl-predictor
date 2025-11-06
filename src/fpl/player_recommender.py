@@ -25,7 +25,7 @@ class FPLPlayerRecommender:
             )  # go up 2 levels
             model_path = os.path.join(project_root, "models", "points_predictor.pkl")
 
-        print(f"🔍 Looking for model at: {model_path}")
+        print(f"INFO: Looking for model at: {model_path}")
 
         # Load trained model
         try:
@@ -42,7 +42,7 @@ class FPLPlayerRecommender:
                 print("Run 'python src/ai/point_predictor.py' first to train the model")
 
         except Exception as e:
-            print(f"❌ Error loading model: {e}")
+            print(f"ERROR: Error loading model: {e}")
 
     def get_latest_player_data(self) -> pd.DataFrame:
         """Get most recent player data"""
@@ -162,12 +162,12 @@ class FPLPlayerRecommender:
     def train_model_if_needed(self):
         """Train model if it doesn't exist"""
         if not self.predictor.is_trained:
-            print("🤖 No trained model found. Training now...")
+            print("INFO: No trained model found. Training now...")
 
             # Load and prepare training data
             historical_data = self.data_loader.load_player_data()
             if historical_data.empty:
-                print("❌ No training data available")
+                print("ERROR: No training data available")
                 return False
 
             # Feature engineering
@@ -187,7 +187,7 @@ class FPLPlayerRecommender:
             model_path = os.path.join(models_dir, "points_predictor.pkl")
             self.predictor.save_model(model_path)
 
-            print(f"✅ Model trained and saved. MAE: {metrics['mae']:.2f}")
+            print(f"SUCCESS: Model trained and saved. MAE: {metrics['mae']:.2f}")
             return True
 
         return True
@@ -200,7 +200,7 @@ def demo_player_recommender():
 
     # Train model if needed
     if not recommender.train_model_if_needed():
-        print("❌ Failed to train model. Exiting.")
+        print("ERROR: Failed to train model. Exiting.")
         return
 
     # Example 1: Compare specific players (use real player IDs from your data)
@@ -238,7 +238,7 @@ def test_specific_players():
     # Test with specific player IDs (adjust based on your data)
     test_players = [1, 2, 10, 20, 50]  # Adjust these IDs
 
-    print(f"\n🔍 Testing specific players: {test_players}")
+    print(f"\nTesting specific players: {test_players}")
     comparison = recommender.compare_players(test_players)
 
     if not comparison.empty:
