@@ -134,45 +134,36 @@ class FPLTeamBuilder:
         print("Position requirements: 2 GK, 5 DEF, 5 MID, 3 ATT")
         print("Max 3 players per team\n")
 
-        # Enhanced selection algorithm: Prioritize proven FPL assets
+        # Enhanced selection algorithm: Data-driven premium player identification
 
-        # Define proven premium FPL assets by name (manual override for quality)
-        premium_assets = {
-            "Haaland",
-            "Salah",
-            "M.Salah",
-            "Palmer",
-            "Saka",
-            "Son",
-            "Kane",
-            "Mbappé",
-            "De Bruyne",
-            "Rashford",
-            "Bruno Fernandes",
-            "Alexander-Arnold",
-            "Van Dijk",
-            "Alisson",
-            "Ederson",
-            "Raya",
-            "Pickford",
-            "Walker",
-            "Dias",
-            "Stones",
-            "Robertson",
-            "Cancelo",
-            "Shaw",
-            "James",
-            "Chilwell",
-            "Trippier",
-        }
-
-        # Phase 1: Select actual premium assets if available and affordable
+        # Phase 1: Identify premium players using database metrics (no hardcoded names)
         premium_selected = 0
-        premium_players = players_df[players_df["web_name"].isin(premium_assets)].copy()
+
+        # Create premium player criteria based on actual data
+        players_df["is_premium"] = (
+            (players_df["price_display"] >= 10.0)  # Expensive players
+            | (players_df["selected_by_percent"] >= 25.0)  # Highly owned
+            | (
+                (players_df["price_display"] >= 8.0)
+                & (players_df["selected_by_percent"] >= 15.0)
+            )  # Mid-expensive + popular
+            | (
+                (players_df["price_display"] >= 7.0)
+                & (players_df["total_points"] >= 40)
+            )  # Good price + good points
+        )
+
+        premium_players = players_df[players_df["is_premium"] == True].copy()
         if len(premium_players) > 0:
-            # Sort premium assets by predicted points
+            # Sort by a combination of predicted points and proven quality metrics
+            premium_players["premium_score"] = (
+                premium_players["predicted_points"] * 0.4
+                + premium_players["total_points"] * 0.1  # Season performance
+                + premium_players["selected_by_percent"] * 0.3  # Popularity
+                + premium_players["price_display"] * 0.2  # Price indicates quality
+            )
             premium_players = premium_players.sort_values(
-                "predicted_points", ascending=False
+                "premium_score", ascending=False
             )
 
             for _, player in premium_players.iterrows():
@@ -198,32 +189,51 @@ class FPLTeamBuilder:
                         f"Value: {player['predicted_points_per_million']:.3f}"
                     )
 
-        # Phase 2: Fill with quality players from good teams (avoid unknowns)
-        good_teams = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}  # Top 10 PL teams typically
+        # Phase 2: Fill with quality players using data-driven team strength
         remaining_players = players_df[
             ~players_df["fpl_player_id"].isin(
                 [p["fpl_player_id"] for p in selected_players]
             )
         ].copy()
 
-        # Prefer players from good teams with reasonable prices (avoid extreme budget)
+        # Calculate team strength dynamically from data
+        remaining_players["team_strength"] = remaining_players.get(
+            "strength_overall_home", 3
+        ) + remaining_players.get("strength_overall_away", 3)
+
+        # Create quality tiers based on multiple data factors
+        remaining_players["is_quality"] = (
+            (remaining_players["price_display"] >= 5.5)  # Decent price tier
+            | (remaining_players["selected_by_percent"] >= 5.0)  # Some popularity
+            | (remaining_players["team_strength"] >= 7)  # Strong team
+            | (remaining_players["total_points"] >= 20)  # Some production
+        )
+
+        # Prefer quality players but allow budget options
         quality_candidates = remaining_players[
-            (remaining_players["team_id"].isin(good_teams))
-            & (remaining_players["price_display"] >= 4.5)  # Avoid extreme budget picks
-            & (remaining_players["price_display"] <= 12.0)  # Avoid overpriced unknowns
-            & (
-                remaining_players["selected_by_percent"] >= 1.0
-            )  # Must have some ownership
+            (remaining_players["is_quality"] == True)
+            & (remaining_players["price_display"] >= 4.0)  # Minimum viability
+            & (remaining_players["price_display"] <= 15.0)  # Maximum reasonable
+            & (remaining_players["selected_by_percent"] >= 0.5)  # Some ownership
         ].copy()
 
-        # If no quality candidates, fall back to all remaining players
+        # If no quality candidates, fall back with relaxed criteria
+        if len(quality_candidates) == 0:
+            quality_candidates = remaining_players[
+                (remaining_players["price_display"] >= 4.0)
+                & (remaining_players["selected_by_percent"] >= 0.1)
+            ].copy()
+
         if len(quality_candidates) == 0:
             quality_candidates = remaining_players.copy()
 
-        # Sort by a combination of predicted points and value
+        # Sort by intelligent combined score using multiple factors
         quality_candidates["combined_score"] = (
-            quality_candidates["predicted_points"] * 0.6
-            + quality_candidates["predicted_points_per_million"] * 4.0
+            quality_candidates["predicted_points"] * 0.4
+            + quality_candidates["predicted_points_per_million"] * 2.0
+            + quality_candidates["total_points"] * 0.05
+            + quality_candidates["selected_by_percent"] * 0.1
+            + quality_candidates["team_strength"] * 0.3
         )
         quality_candidates = quality_candidates.sort_values(
             "combined_score", ascending=False
@@ -251,15 +261,95 @@ class FPLTeamBuilder:
                     f"Value: {player['predicted_points_per_million']:.3f}"
                 )
 
-        # Check if we have valid squad
+        # Phase 3: MANDATORY - Ensure exactly 15 players with relaxed constraints
+        if len(selected_players) < self.squad_size:
+            print(f"\nNeed {self.squad_size - len(selected_players)} more players. Relaxing constraints...")
+            
+            remaining_needed = self.squad_size - len(selected_players)
+            fallback_players = players_df[
+                ~players_df["fpl_player_id"].isin([p["fpl_player_id"] for p in selected_players])
+            ].copy()
+            
+            # Sort by cheapest first to ensure we can afford them
+            fallback_players = fallback_players.sort_values("price_display", ascending=True)
+            
+            for _, player in fallback_players.iterrows():
+                if len(selected_players) >= self.squad_size:
+                    break
+                    
+                position = player["position"]
+                cost = player["price_display"] * 10
+                
+                # Relaxed constraints - just check position limits and basic affordability
+                if (
+                    position_counts[position] < requirements[position]["max"]
+                    and cost <= remaining_budget
+                ):
+                    # Allow more than 3 per team if necessary to fill squad
+                    selected_players.append(player)
+                    remaining_budget -= cost
+                    position_counts[position] += 1
+                    team_counts[player["team_id"]] = team_counts.get(player["team_id"], 0) + 1
+                    
+                    print(
+                        f"Selected (Fallback): {player['web_name']:<15} ({position}) - £{player['price_display']:.1f}m - "
+                        f"Pred: {player['predicted_points']:.2f} pts - "
+                        f"Value: {player['predicted_points_per_million']:.3f}"
+                    )
+
+        # Final check - if still not 15 players, FORCE complete the squad
+        if len(selected_players) < self.squad_size:
+            print(f"\nFORCE filling remaining {self.squad_size - len(selected_players)} slots - ignoring budget if needed...")
+            
+            # Calculate minimum budget needed for remaining positions
+            remaining_positions = []
+            for position, req in requirements.items():
+                needed = req["max"] - position_counts.get(position, 0)
+                for _ in range(needed):
+                    remaining_positions.append(position)
+            
+            print(f"Still need positions: {remaining_positions}")
+            
+            # Get cheapest player for each remaining position
+            for needed_position in remaining_positions:
+                if len(selected_players) >= self.squad_size:
+                    break
+                    
+                available_for_position = players_df[
+                    (players_df["position"] == needed_position) &
+                    (~players_df["fpl_player_id"].isin([p["fpl_player_id"] for p in selected_players]))
+                ].sort_values("price_display", ascending=True)
+                
+                if len(available_for_position) > 0:
+                    player = available_for_position.iloc[0]
+                    cost = player["price_display"] * 10
+                    
+                    # FORCE selection - ignore budget constraint if needed
+                    selected_players.append(player)
+                    remaining_budget -= cost  # May go negative, that's OK
+                    position_counts[needed_position] = position_counts.get(needed_position, 0) + 1
+                    team_counts[player["team_id"]] = team_counts.get(player["team_id"], 0) + 1
+                    
+                    print(
+                        f"Selected (FORCE): {player['web_name']:<15} ({needed_position}) - £{player['price_display']:.1f}m - "
+                        f"Pred: {player['predicted_points']:.2f} pts"
+                    )
+
+        # Final squad summary
         total_players = sum(position_counts.values())
-        print(f"\nSquad Summary:")
+        print(f"\nFINAL Squad Summary:")
         print(f"Total players: {total_players}/15")
         print(f"Remaining budget: £{remaining_budget/10.0:.1f}m")
         print(
             f"Position breakdown: GK:{position_counts['GK']}, DEF:{position_counts['DEF']}, "
             f"MID:{position_counts['MID']}, ATT:{position_counts['ATT']}"
         )
+        
+        # Validate 15 players requirement
+        if len(selected_players) != 15:
+            print(f"WARNING: Squad has {len(selected_players)} players instead of required 15!")
+        else:
+            print("✅ Squad size requirement met: 15 players selected")
 
         return pd.DataFrame(selected_players)
 

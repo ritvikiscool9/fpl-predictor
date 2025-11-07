@@ -86,38 +86,38 @@ class FPLPlayerRecommender:
         try:
             raw_predictions = self.predictor.predict(comparison_data)
 
-            # ENHANCED: Scale predictions to realistic FPL ranges with quality bias
+            # ENHANCED: Scale predictions to realistic FPL ranges with data-driven quality bias
             # Raw predictions are ~0.5-1.0, realistic FPL is 2-15+ points
-            # Apply intelligent scaling that favors proven players
-
-            # Define premium player names that should get prediction boosts
-            premium_names = {
-                "Haaland",
-                "Salah",
-                "M.Salah",
-                "Palmer",
-                "Saka",
-                "Son",
-                "Kane",
-                "De Bruyne",
-                "Rashford",
-                "Bruno Fernandes",
-                "Alexander-Arnold",
-                "Van Dijk",
-                "Alisson",
-                "Ederson",
-                "Raya",
-                "Pickford",
-            }
+            # Apply intelligent scaling based on actual player metrics from database
 
             scaled_predictions = []
             for i, pred in enumerate(raw_predictions):
                 player = comparison_data.iloc[i]
                 price = player["value"] / 10.0
-                player_name = player.get("web_name", "")
 
-                # Check if this is a premium asset
-                is_premium = any(name in player_name for name in premium_names)
+                # Data-driven premium player identification (handle None values)
+                ownership = float(player.get("selected_by_percent", 0) or 0)
+                total_points_season = float(player.get("total_points", 0) or 0)
+                form = float(player.get("form", 0) or 0)
+
+                # Define premium status based on multiple data factors
+                is_premium = (
+                    (price >= 10.0)  # Expensive players
+                    or (ownership >= 30.0)  # Highly owned players
+                    or (total_points_season >= 50)  # High season scorers
+                    or (price >= 8.0 and ownership >= 15.0)  # Mid-expensive + popular
+                    or (
+                        price >= 7.0 and total_points_season >= 40
+                    )  # Good price + good points
+                )
+
+                # Quality tier identification
+                is_high_quality = (
+                    (price >= 7.0)
+                    or (ownership >= 15.0)
+                    or (total_points_season >= 30)
+                    or (form >= 7.0)
+                )
 
                 # Base scaling by position
                 if player.get("element_type", 0) == 1:  # GK
@@ -131,24 +131,31 @@ class FPLPlayerRecommender:
                 else:
                     scaled_pred = (pred * 6) + 4  # Default
 
-                # Premium player bonus (names we know are good)
+                # Data-driven quality bonuses
                 if is_premium:
-                    scaled_pred += 3  # Big boost for premium assets
-                elif price >= 10.0:
-                    scaled_pred += 2  # Expensive player bonus
+                    scaled_pred += 3  # Big boost for data-identified premium assets
+                elif is_high_quality:
+                    scaled_pred += 2  # Moderate boost for quality players
                 elif price >= 8.0:
-                    scaled_pred += 1  # Mid-tier bonus
+                    scaled_pred += 1  # Price-based bonus
 
-                # Ownership bonus (popular players are usually good)
-                ownership = player.get("selected_by_percent", 0)
-                if ownership >= 20:
-                    scaled_pred += 2  # High ownership bonus
-                elif ownership >= 10:
-                    scaled_pred += 1  # Moderate ownership bonus
+                # Performance-based bonuses
+                if total_points_season >= 60:
+                    scaled_pred += 2  # Exceptional season performers
+                elif total_points_season >= 40:
+                    scaled_pred += 1  # Good season performers
 
-                # Team quality bonus (top 6 teams)
-                team_id = player.get("team_id", 0)
-                if team_id in {1, 2, 3, 4, 5, 6}:  # Arsenal, Liverpool, City, etc.
+                if form >= 8.0:
+                    scaled_pred += 1.5  # Hot form bonus
+                elif form >= 6.0:
+                    scaled_pred += 0.5  # Good form bonus
+
+                # Team quality bonus (top teams based on league position/strength)
+                team_id = int(player.get("team_id", 0) or 0)
+                strength_home = float(player.get("strength_overall_home", 0) or 0)
+                strength_away = float(player.get("strength_overall_away", 0) or 0)
+                team_strength = strength_home + strength_away
+                if team_strength >= 10 or team_id in {1, 2, 3, 4, 5, 6}:
                     scaled_pred += 1
 
                 scaled_predictions.append(max(scaled_pred, 2.0))  # Minimum 2 points
