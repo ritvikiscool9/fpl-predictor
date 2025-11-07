@@ -263,23 +263,29 @@ class FPLTeamBuilder:
 
         # Phase 3: MANDATORY - Ensure exactly 15 players with relaxed constraints
         if len(selected_players) < self.squad_size:
-            print(f"\nNeed {self.squad_size - len(selected_players)} more players. Relaxing constraints...")
-            
+            print(
+                f"\nNeed {self.squad_size - len(selected_players)} more players. Relaxing constraints..."
+            )
+
             remaining_needed = self.squad_size - len(selected_players)
             fallback_players = players_df[
-                ~players_df["fpl_player_id"].isin([p["fpl_player_id"] for p in selected_players])
+                ~players_df["fpl_player_id"].isin(
+                    [p["fpl_player_id"] for p in selected_players]
+                )
             ].copy()
-            
+
             # Sort by cheapest first to ensure we can afford them
-            fallback_players = fallback_players.sort_values("price_display", ascending=True)
-            
+            fallback_players = fallback_players.sort_values(
+                "price_display", ascending=True
+            )
+
             for _, player in fallback_players.iterrows():
                 if len(selected_players) >= self.squad_size:
                     break
-                    
+
                 position = player["position"]
                 cost = player["price_display"] * 10
-                
+
                 # Relaxed constraints - just check position limits and basic affordability
                 if (
                     position_counts[position] < requirements[position]["max"]
@@ -289,8 +295,10 @@ class FPLTeamBuilder:
                     selected_players.append(player)
                     remaining_budget -= cost
                     position_counts[position] += 1
-                    team_counts[player["team_id"]] = team_counts.get(player["team_id"], 0) + 1
-                    
+                    team_counts[player["team_id"]] = (
+                        team_counts.get(player["team_id"], 0) + 1
+                    )
+
                     print(
                         f"Selected (Fallback): {player['web_name']:<15} ({position}) - £{player['price_display']:.1f}m - "
                         f"Pred: {player['predicted_points']:.2f} pts - "
@@ -299,37 +307,47 @@ class FPLTeamBuilder:
 
         # Final check - if still not 15 players, FORCE complete the squad
         if len(selected_players) < self.squad_size:
-            print(f"\nFORCE filling remaining {self.squad_size - len(selected_players)} slots - ignoring budget if needed...")
-            
+            print(
+                f"\nFORCE filling remaining {self.squad_size - len(selected_players)} slots - ignoring budget if needed..."
+            )
+
             # Calculate minimum budget needed for remaining positions
             remaining_positions = []
             for position, req in requirements.items():
                 needed = req["max"] - position_counts.get(position, 0)
                 for _ in range(needed):
                     remaining_positions.append(position)
-            
+
             print(f"Still need positions: {remaining_positions}")
-            
+
             # Get cheapest player for each remaining position
             for needed_position in remaining_positions:
                 if len(selected_players) >= self.squad_size:
                     break
-                    
+
                 available_for_position = players_df[
-                    (players_df["position"] == needed_position) &
-                    (~players_df["fpl_player_id"].isin([p["fpl_player_id"] for p in selected_players]))
+                    (players_df["position"] == needed_position)
+                    & (
+                        ~players_df["fpl_player_id"].isin(
+                            [p["fpl_player_id"] for p in selected_players]
+                        )
+                    )
                 ].sort_values("price_display", ascending=True)
-                
+
                 if len(available_for_position) > 0:
                     player = available_for_position.iloc[0]
                     cost = player["price_display"] * 10
-                    
+
                     # FORCE selection - ignore budget constraint if needed
                     selected_players.append(player)
                     remaining_budget -= cost  # May go negative, that's OK
-                    position_counts[needed_position] = position_counts.get(needed_position, 0) + 1
-                    team_counts[player["team_id"]] = team_counts.get(player["team_id"], 0) + 1
-                    
+                    position_counts[needed_position] = (
+                        position_counts.get(needed_position, 0) + 1
+                    )
+                    team_counts[player["team_id"]] = (
+                        team_counts.get(player["team_id"], 0) + 1
+                    )
+
                     print(
                         f"Selected (FORCE): {player['web_name']:<15} ({needed_position}) - £{player['price_display']:.1f}m - "
                         f"Pred: {player['predicted_points']:.2f} pts"
@@ -344,10 +362,12 @@ class FPLTeamBuilder:
             f"Position breakdown: GK:{position_counts['GK']}, DEF:{position_counts['DEF']}, "
             f"MID:{position_counts['MID']}, ATT:{position_counts['ATT']}"
         )
-        
+
         # Validate 15 players requirement
         if len(selected_players) != 15:
-            print(f"WARNING: Squad has {len(selected_players)} players instead of required 15!")
+            print(
+                f"WARNING: Squad has {len(selected_players)} players instead of required 15!"
+            )
         else:
             print("✅ Squad size requirement met: 15 players selected")
 
