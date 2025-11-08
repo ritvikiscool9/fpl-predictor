@@ -181,7 +181,7 @@ if __name__ == "__main__":
         metrics = predictor.train(enhanced_data)
 
         # Cross-validation evaluation
-        print("\n🔍 Cross-validation evaluation...")
+        print("\nCross-validation evaluation...")
         cv_metrics = predictor.evaluate_with_cv(enhanced_data)
 
         # Save model

@@ -7,28 +7,69 @@ Personal reference for implementing AI system to analyze FPL database and genera
 
 ## 🎯 Current Status
 
-- ✅ Database fully populated (teams, players, fixtures, stats)
-- ✅ Rule-based prediction system working
-- ⏳ Need to implement ML models for better predictions
+- ✅ Database fully populated with real data (7,302 performance records across 10 gameweeks)
+- ✅ AI model trained and working with real data (MAE: 1.28)
+- ✅ Complete pricing integration and value analysis
+- ✅ Organized project structure with dedicated database management
+- ✅ Fast, optimized data refresh system (730x performance improvement)
 
-## 🗄️ Available Data in Database
+## 🗄️ Database & Project Structure
 
-### Tables & Data Volume
+### Project Organization
 
-- **teams**: 20 Premier League teams with mappings
-- **players**: 743 players with FPL + football-data mappings
-- **gameweeks**: 38 gameweeks for 2025-26 season
+```
+src/
+├── ai/                     # AI/ML components
+│   ├── data_loader.py     # Data loading with pagination
+│   ├── feature_engineering.py  # Feature creation
+│   └── point_predictor.py # ML model
+├── config/                # Configuration
+│   └── supabase_client.py # Database connection
+├── database/              # Database management scripts
+│   ├── fast_performance_refresh.py  # Optimized data refresh
+│   ├── update_player_prices.py      # Price updates
+│   ├── check_database.py           # Health checks
+│   └── README.md                   # Database documentation
+├── fpl/                   # FPL-specific logic
+│   └── player_recommender.py # Player recommendations
+└── tests/                 # Test files
+```
+
+### Database Tables & Data Volume
+
+- **player_performances**: 7,302 records (complete 10 gameweeks, 2024-25 season)
+- **historical_player_stats**: 51,400 records (historical data)
+- **players**: 743 current players with FPL mappings
+- **teams**: 20 Premier League teams
 - **fixtures**: 380 fixtures with results and difficulty ratings
-- **current_player_stats**: Real-time stats for all 743 players
 - **current_team_stats**: Team performance metrics
-- **player_performances**: Historical performance data
+
+## 🚀 Quick Start
+
+### Database Management
+```bash
+# Easy database management interface
+python database_manager.py
+
+# Or run individual scripts:
+python src/database/check_database.py          # Check database health
+python src/database/fast_performance_refresh.py  # Refresh player data
+python src/database/update_player_prices.py    # Update current prices
+```
+
+### AI Testing
+```bash
+# Test AI with real Premier League players
+python src/test_real_players.py
+```
 
 ### Key Data Points Available
 
-- Player stats: goals, assists, minutes, points, price, ownership%
-- Team metrics: wins, clean sheets, goals for/against
-- Fixture data: difficulty ratings, home/away status
-- Form indicators: recent performance trends
+- **Player Performance**: Goals, assists, minutes, points, form trends
+- **Current Pricing**: Real FPL prices and ownership percentages  
+- **Team Metrics**: Wins, clean sheets, goals for/against
+- **Fixture Analysis**: Difficulty ratings, home/away context
+- **Value Analysis**: Points per million calculations
 
 ## 🤖 AI Implementation Steps
 
