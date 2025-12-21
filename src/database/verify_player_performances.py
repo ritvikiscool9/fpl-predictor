@@ -5,7 +5,10 @@ Comprehensive verification of player_performances table
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "config"))
+config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config"))
+if config_path not in sys.path:
+    sys.path.append(config_path)
+
 from supabase_client import get_supabase_client
 
 
@@ -13,10 +16,10 @@ def verify_player_performances():
     """Verify the state of player_performances table"""
     supabase = get_supabase_client()
 
-    print("🔍 Verifying player_performances table...")
+    print("Verifying player_performances table...")
 
     # Method 1: Count per gameweek using individual queries
-    print("\n📊 Method 1: Individual gameweek queries")
+    print("\nMethod 1: Individual gameweek queries")
     total_individual = 0
     gameweeks_with_data = []
 
@@ -40,7 +43,7 @@ def verify_player_performances():
     print(f"  Gameweeks with data: {gameweeks_with_data}")
 
     # Method 2: Total count query
-    print("\n📊 Method 2: Total count query")
+    print("\nMethod 2: Total count query")
     try:
         total_result = supabase.table("player_performances").select("id").execute()
         total_count = len(total_result.data) if total_result.data else 0
@@ -49,7 +52,7 @@ def verify_player_performances():
         print(f"  Error getting total count: {e}")
 
     # Method 3: Get unique gameweeks
-    print("\n📊 Method 3: Unique gameweeks from full data")
+    print("\nMethod 3: Unique gameweeks from full data")
     try:
         unique_result = (
             supabase.table("player_performances").select("gameweek_id").execute()
@@ -66,7 +69,7 @@ def verify_player_performances():
         print(f"  Error getting unique gameweeks: {e}")
 
     # Method 4: Sample recent records
-    print("\n📊 Method 4: Sample recent records")
+    print("\nMethod 4: Sample recent records")
     try:
         sample_result = (
             supabase.table("player_performances")

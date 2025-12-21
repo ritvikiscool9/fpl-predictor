@@ -16,7 +16,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def analyze_player_performances_gaps():
     """Analyze what gameweeks are missing in player_performances"""
-    print("🔍 Analyzing player_performances data gaps...")
+    print("Analyzing player_performances data gaps...")
     print("=" * 60)
 
     try:
@@ -24,7 +24,7 @@ def analyze_player_performances_gaps():
         result = supabase.table("player_performances").select("gameweek_id").execute()
 
         if not result.data:
-            print("❌ No player_performances data found!")
+            print("ERROR: No player_performances data found!")
             return
 
         df = pd.DataFrame(result.data)
@@ -33,12 +33,12 @@ def analyze_player_performances_gaps():
         gameweeks_present = sorted(df["gameweek_id"].unique())
         total_records = len(df)
 
-        print(f"📊 Total records: {total_records:,}")
-        print(f"🎯 Gameweeks with data: {gameweeks_present}")
+        print(f"Total records: {total_records:,}")
+        print(f"Gameweeks with data: {gameweeks_present}")
 
         # Count records per gameweek
         gw_counts = df["gameweek_id"].value_counts().sort_index()
-        print(f"\n📈 Records per gameweek:")
+        print(f"\nRecords per gameweek:")
         for gw, count in gw_counts.items():
             print(f"  GW {gw}: {count:,} records")
 
@@ -48,9 +48,9 @@ def analyze_player_performances_gaps():
             missing_gws = [gw for gw in expected_gws if gw not in gameweeks_present]
 
             if missing_gws:
-                print(f"\n⚠️  Missing gameweeks: {missing_gws}")
+                print(f"\nMissing gameweeks: {missing_gws}")
             else:
-                print(f"\n✅ All gameweeks 1-{max(gameweeks_present)} are present")
+                print(f"\nAll gameweeks 1-{max(gameweeks_present)} are present")
 
         # Check for consistency
         if len(gw_counts) > 1:
@@ -62,13 +62,13 @@ def analyze_player_performances_gaps():
                     inconsistent_gws.append(f"GW{gw}({count})")
 
             if inconsistent_gws:
-                print(f"\n⚠️  Gameweeks with low record counts: {inconsistent_gws}")
+                print(f"\nGameweeks with low record counts: {inconsistent_gws}")
                 print(f"    Average records per GW: {avg_records:.0f}")
 
         return gameweeks_present, gw_counts.to_dict()
 
     except Exception as e:
-        print(f"❌ Error analyzing data: {e}")
+        print(f"ERROR: Error analyzing data: {e}")
         return None, None
 
 
@@ -76,7 +76,7 @@ def check_fpl_api_availability():
     """Check what gameweeks are available from FPL API"""
     import requests
 
-    print(f"\n🌐 Checking FPL API availability...")
+    print(f"\nChecking FPL API availability...")
 
     try:
         # Get current season info
@@ -91,8 +91,8 @@ def check_fpl_api_availability():
             (gw["id"] for gw in data["events"] if gw.get("is_current", False)), None
         )
 
-        print(f"✅ Finished gameweeks available: {finished_gws}")
-        print(f"📍 Current gameweek: {current_gw}")
+        print(f"Finished gameweeks available: {finished_gws}")
+        print(f"Current gameweek: {current_gw}")
 
         # Test API access for a specific gameweek
         if finished_gws:
@@ -104,22 +104,22 @@ def check_fpl_api_availability():
                 test_data = test_response.json()
                 player_count = len(test_data.get("elements", []))
                 print(
-                    f"✅ API test successful - GW{test_gw} has {player_count} player records"
+                    f"API test successful - GW{test_gw} has {player_count} player records"
                 )
             else:
                 print(
-                    f"⚠️  API test failed for GW{test_gw}: HTTP {test_response.status_code}"
+                    f"API test failed for GW{test_gw}: HTTP {test_response.status_code}"
                 )
 
         return finished_gws, current_gw
 
     except Exception as e:
-        print(f"❌ Error checking FPL API: {e}")
+        print(f"ERROR: Error checking FPL API: {e}")
         return None, None
 
 
 def main():
-    print("🏆 FPL Database - Player Performances Gap Analysis")
+    print("FPL Database - Player Performances Gap Analysis")
     print("=" * 70)
 
     # Analyze current database
@@ -132,17 +132,17 @@ def main():
     if db_gameweeks and api_gameweeks:
         missing_from_db = [gw for gw in api_gameweeks if gw not in db_gameweeks]
 
-        print(f"\n🎯 RECOMMENDATION:")
+        print(f"\nRECOMMENDATION:")
         if missing_from_db:
-            print(f"  ⚠️  Your database is missing data for: {missing_from_db}")
-            print(f"  💡 Run: echo 3 | python database_refresh.py")
+            print(f"  Your database is missing data for: {missing_from_db}")
+            print(f"  TIP: Run: echo 3 | python database_refresh.py")
             print(f"     This will populate all missing gameweeks")
         else:
-            print(f"  ✅ Your database has all available gameweeks!")
+            print(f"  Your database has all available gameweeks!")
 
         if db_counts and len(set(db_counts.values())) > 1:
-            print(f"  ⚠️  Some gameweeks have inconsistent record counts")
-            print(f"  💡 Consider refreshing to ensure data quality")
+            print(f"  Some gameweeks have inconsistent record counts")
+            print(f"  TIP: Consider refreshing to ensure data quality")
 
 
 if __name__ == "__main__":

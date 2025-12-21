@@ -6,11 +6,11 @@ Comprehensive refresh of all FPL data from multiple sources
 """
 
 import os
-import sys
+
 import requests
 import pandas as pd
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -30,8 +30,13 @@ class FPLDatabaseRefresh:
     def log(self, message: str, level: str = "INFO"):
         """Enhanced logging with timestamps"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        prefix = {"INFO": "ℹ️", "SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "❌"}
-        print(f"[{timestamp}] {prefix.get(level, 'ℹ️')} {message}")
+        prefix = {
+            "INFO": "INFO",
+            "SUCCESS": "SUCCESS",
+            "WARNING": "WARNING",
+            "ERROR": "ERROR",
+        }
+        print(f"[{timestamp}] {prefix.get(level, 'INFO')} {message}")
 
     def clear_table(self, table_name: str, condition: dict = None):
         """Safely clear table data with optional condition"""
@@ -462,7 +467,7 @@ class FPLDatabaseRefresh:
 
     def full_database_refresh(self, include_historical: bool = True):
         """Perform complete database refresh"""
-        self.log("🚀 Starting FULL DATABASE REFRESH", "SUCCESS")
+        self.log("Starting FULL DATABASE REFRESH", "SUCCESS")
         self.log("=" * 60)
 
         start_time = time.time()
@@ -487,14 +492,14 @@ class FPLDatabaseRefresh:
         # Summary
         elapsed = time.time() - start_time
         self.log("=" * 60)
-        self.log(f"🎉 DATABASE REFRESH COMPLETE! ({elapsed:.1f}s)", "SUCCESS")
+        self.log(f"DATABASE REFRESH COMPLETE! ({elapsed:.1f}s)", "SUCCESS")
 
         # Verify refresh
         self.verify_database_health()
 
     def verify_database_health(self):
         """Verify database has been properly refreshed"""
-        self.log("\n🔍 Database Health Check:")
+        self.log("\nDatabase Health Check:")
 
         tables_to_check = [
             ("teams", 20),
@@ -516,10 +521,10 @@ class FPLDatabaseRefresh:
                 count = result.count if result.count else 0
 
                 if count >= expected_min:
-                    self.log(f"  ✅ {table}: {count:,} records", "SUCCESS")
+                    self.log(f"  {table}: {count:,} records", "SUCCESS")
                 else:
                     self.log(
-                        f"  ⚠️  {table}: {count:,} records (expected >{expected_min:,})",
+                        f"  {table}: {count:,} records (expected >{expected_min:,})",
                         "WARNING",
                     )
                     all_healthy = False
@@ -529,14 +534,14 @@ class FPLDatabaseRefresh:
                 all_healthy = False
 
         if all_healthy:
-            self.log("\n🎉 All tables are healthy!", "SUCCESS")
+            self.log("\nAll tables are healthy!", "SUCCESS")
         else:
-            self.log("\n⚠️  Some tables may need attention", "WARNING")
+            self.log("\nSome tables may need attention", "WARNING")
 
 
 def main():
     """Main execution function"""
-    print("🏆 FPL Database Refresh System")
+    print("FPL Database Refresh System")
     print("=" * 60)
 
     refresher = FPLDatabaseRefresh()

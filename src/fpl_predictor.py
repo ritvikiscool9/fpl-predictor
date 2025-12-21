@@ -1,10 +1,7 @@
 # env\Scripts\activate
 import requests
-import pandas as pd
-import json
 import os
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -32,19 +29,15 @@ def save_teams_to_db(teams_data):
     try:
         for team in teams_data:
             # Use upsert to avoid duplicates
-            result = (
-                supabase.table("teams")
-                .upsert(
-                    {
-                        "fpl_team_id": team["id"],
-                        "name": team["name"],
-                        "short_name": team["short_name"],
-                        "code": team.get("code"),
-                    },
-                    on_conflict="fpl_team_id",
-                )
-                .execute()
-            )
+            supabase.table("teams").upsert(
+                {
+                    "fpl_team_id": team["id"],
+                    "name": team["name"],
+                    "short_name": team["short_name"],
+                    "code": team.get("code"),
+                },
+                on_conflict="fpl_team_id",
+            ).execute()
         print(f"Successfully saved {len(teams_data)} teams to database")
     except Exception as e:
         print(f"Error saving teams to database: {e}")
@@ -81,22 +74,18 @@ def save_players_to_db(players_data, team_mapping):
                 team_id = team_result.data[0]["id"]
 
             if team_id:
-                result = (
-                    supabase.table("players")
-                    .upsert(
-                        {
-                            "fpl_player_id": player["id"],
-                            "first_name": player["first_name"],
-                            "second_name": player["second_name"],
-                            "web_name": player["web_name"],
-                            "team_id": team_id,
-                            "element_type": player["element_type"],
-                            "status": player.get("status", "a"),
-                        },
-                        on_conflict="fpl_player_id",
-                    )
-                    .execute()
-                )
+                supabase.table("players").upsert(
+                    {
+                        "fpl_player_id": player["id"],
+                        "first_name": player["first_name"],
+                        "second_name": player["second_name"],
+                        "web_name": player["web_name"],
+                        "team_id": team_id,
+                        "element_type": player["element_type"],
+                        "status": player.get("status", "a"),
+                    },
+                    on_conflict="fpl_player_id",
+                ).execute()
                 saved_count += 1
 
         print(f"Successfully saved {saved_count} players to database")
@@ -224,23 +213,19 @@ def save_gameweek_info(gameweek_data):
     """Save gameweek information to database"""
     try:
         for gw in gameweek_data:
-            result = (
-                supabase.table("gameweeks")
-                .upsert(
-                    {
-                        "gameweek_number": gw["id"],
-                        "season": "2025-26",
-                        "name": gw.get("name", f"Gameweek {gw['id']}"),
-                        "deadline_time": gw.get("deadline_time"),
-                        "is_finished": gw.get("finished", False),
-                        "is_current": gw.get("is_current", False),
-                        "average_entry_score": gw.get("average_entry_score", 0),
-                        "highest_score": gw.get("highest_score", 0),
-                    },
-                    on_conflict="gameweek_number,season",
-                )
-                .execute()
-            )
+            supabase.table("gameweeks").upsert(
+                {
+                    "gameweek_number": gw["id"],
+                    "season": "2025-26",
+                    "name": gw.get("name", f"Gameweek {gw['id']}"),
+                    "deadline_time": gw.get("deadline_time"),
+                    "is_finished": gw.get("finished", False),
+                    "is_current": gw.get("is_current", False),
+                    "average_entry_score": gw.get("average_entry_score", 0),
+                    "highest_score": gw.get("highest_score", 0),
+                },
+                on_conflict="gameweek_number,season",
+            ).execute()
         print(f"Saved {len(gameweek_data)} gameweeks to database")
     except Exception as e:
         print(f"Error saving gameweeks: {e}")
@@ -264,52 +249,46 @@ def save_current_player_stats(players_data, current_gameweek_id):
             player_db_id = player_result.data[0]["id"]
 
             # Save current stats
-            result = (
-                supabase.table("current_player_stats")
-                .upsert(
-                    {
-                        "player_id": player_db_id,
-                        "gameweek_id": current_gameweek_id,
-                        "total_points": player.get("total_points", 0),
-                        "minutes": player.get("minutes", 0),
-                        "goals_scored": player.get("goals_scored", 0),
-                        "assists": player.get("assists", 0),
-                        "clean_sheets": player.get("clean_sheets", 0),
-                        "goals_conceded": player.get("goals_conceded", 0),
-                        "own_goals": player.get("own_goals", 0),
-                        "penalties_saved": player.get("penalties_saved", 0),
-                        "penalties_missed": player.get("penalties_missed", 0),
-                        "yellow_cards": player.get("yellow_cards", 0),
-                        "red_cards": player.get("red_cards", 0),
-                        "saves": player.get("saves", 0),
-                        "bonus": player.get("bonus", 0),
-                        "bps": player.get("bps", 0),
-                        "influence": float(player.get("influence", 0)),
-                        "creativity": float(player.get("creativity", 0)),
-                        "threat": float(player.get("threat", 0)),
-                        "ict_index": float(player.get("ict_index", 0)),
-                        "now_cost": player.get("now_cost", 50),
-                        "selected_by_percent": float(
-                            player.get("selected_by_percent", 0)
-                        ),
-                        "transfers_in": player.get("transfers_in", 0),
-                        "transfers_out": player.get("transfers_out", 0),
-                        "form": float(player.get("form", 0)),
-                        "points_per_game": float(player.get("points_per_game", 0)),
-                        "status": player.get("status", "a"),
-                        "news": player.get("news", ""),
-                        "chance_of_playing_this_round": player.get(
-                            "chance_of_playing_this_round"
-                        ),
-                        "chance_of_playing_next_round": player.get(
-                            "chance_of_playing_next_round"
-                        ),
-                        "data_updated_at": datetime.now().isoformat(),
-                    },
-                    on_conflict="player_id,gameweek_id",
-                )
-                .execute()
-            )
+            supabase.table("current_player_stats").upsert(
+                {
+                    "player_id": player_db_id,
+                    "gameweek_id": current_gameweek_id,
+                    "total_points": player.get("total_points", 0),
+                    "minutes": player.get("minutes", 0),
+                    "goals_scored": player.get("goals_scored", 0),
+                    "assists": player.get("assists", 0),
+                    "clean_sheets": player.get("clean_sheets", 0),
+                    "goals_conceded": player.get("goals_conceded", 0),
+                    "own_goals": player.get("own_goals", 0),
+                    "penalties_saved": player.get("penalties_saved", 0),
+                    "penalties_missed": player.get("penalties_missed", 0),
+                    "yellow_cards": player.get("yellow_cards", 0),
+                    "red_cards": player.get("red_cards", 0),
+                    "saves": player.get("saves", 0),
+                    "bonus": player.get("bonus", 0),
+                    "bps": player.get("bps", 0),
+                    "influence": float(player.get("influence", 0)),
+                    "creativity": float(player.get("creativity", 0)),
+                    "threat": float(player.get("threat", 0)),
+                    "ict_index": float(player.get("ict_index", 0)),
+                    "now_cost": player.get("now_cost", 50),
+                    "selected_by_percent": float(player.get("selected_by_percent", 0)),
+                    "transfers_in": player.get("transfers_in", 0),
+                    "transfers_out": player.get("transfers_out", 0),
+                    "form": float(player.get("form", 0)),
+                    "points_per_game": float(player.get("points_per_game", 0)),
+                    "status": player.get("status", "a"),
+                    "news": player.get("news", ""),
+                    "chance_of_playing_this_round": player.get(
+                        "chance_of_playing_this_round"
+                    ),
+                    "chance_of_playing_next_round": player.get(
+                        "chance_of_playing_next_round"
+                    ),
+                    "data_updated_at": datetime.now().isoformat(),
+                },
+                on_conflict="player_id,gameweek_id",
+            ).execute()
             saved_count += 1
 
         print(f"Saved current stats for {saved_count} players")
@@ -338,33 +317,7 @@ def get_fpl_data_from_db():
                 }
             )
 
-        # Get players with current stats
-        players_query = """
-        SELECT 
-            p.fpl_player_id as id,
-            p.first_name,
-            p.second_name, 
-            p.web_name,
-            p.team_id,
-            p.element_type,
-            p.status,
-            t.fpl_team_id as team,
-            COALESCE(cps.total_points, 0) as total_points,
-            COALESCE(cps.minutes, 0) as minutes,
-            COALESCE(cps.goals_scored, 0) as goals_scored,
-            COALESCE(cps.assists, 0) as assists,
-            COALESCE(cps.clean_sheets, 0) as clean_sheets,
-            COALESCE(cps.now_cost, 50) as now_cost,
-            COALESCE(cps.selected_by_percent, 0) as selected_by_percent,
-            COALESCE(cps.form, 0) as form,
-            COALESCE(cps.points_per_game, 0) as points_per_game
-        FROM players p
-        JOIN teams t ON p.team_id = t.id
-        LEFT JOIN current_player_stats cps ON p.id = cps.player_id
-        ORDER BY p.fpl_player_id
-        """
-
-        # Use simpler approach without complex SQL
+        # Use simpler approach without complex SQL (previous SQL query removed)
         players_result = None
 
         if not players_result:
@@ -445,9 +398,9 @@ urlLiveGameweek = "https://fantasy.premierleague.com/api/event/{gameweek}/live/"
 
 # Test code to ensure endpoints return correct information
 headers = {"X-Auth-Token": API_KEY}
-response = requests.get(urlFixtures, headers=headers)
 
 
+# Create a mapping between football-data.org and the FPL API
 # Create a mapping between football-data.org and the FPL API
 def create_team_mapping():
     """Create team mapping using Supabase database instead of JSON cache"""
@@ -1318,7 +1271,7 @@ def get_best_players_by_position(match_data, top_n=5):
             try:
                 prediction = predict_player_points(player, match_data)
                 predictions.append(prediction)
-            except Exception as e:
+            except Exception:
                 continue  # Skip problematic players
 
         # Sort by predicted points
@@ -1356,7 +1309,7 @@ def generate_transfer_recommendations(match_data, budget=1000, top_n=3):
             prediction = predict_player_points(player, match_data)
             if prediction["predicted_points"] > 3:  # Only consider decent predictions
                 all_predictions.append(prediction)
-        except Exception as e:
+        except Exception:
             continue
 
     if duplicates_found > 0:
@@ -1419,7 +1372,7 @@ def build_optimal_team(match_data, budget=1000):  # £100m budget
             prediction = predict_player_points(player, match_data)
             prediction["team_name"] = teams.get(prediction["team_id"], "Unknown")
             all_predictions.append(prediction)
-        except Exception as e:
+        except Exception:
             continue
 
     # Sort by predicted points within each position
@@ -1578,7 +1531,7 @@ try:
     best_players = get_best_players_by_position(match_data, top_n=3)
 
     for position, players in best_players.items():
-        print(f"\n🏆 TOP 3 {position.upper()}:")
+        print(f"\nTOP 3 {position.upper()}:")
         for i, player in enumerate(players, 1):
             print(
                 f"  {i}. {player['name']} - {player['predicted_points']} pts "
@@ -1586,13 +1539,13 @@ try:
             )
 
     # Generate transfer recommendations
-    print(f"\n💰 TRANSFER RECOMMENDATIONS (Budget: £10.0m):")
+    print(f"\nTRANSFER RECOMMENDATIONS (Budget: £10.0m):")
     recommendations = generate_transfer_recommendations(
         match_data, budget=100
     )  # £10m budget
 
     if recommendations["best_value"]:
-        print("\n🎯 Best Value Picks:")
+        print("\nBest Value Picks:")
         for i, player in enumerate(recommendations["best_value"][:3], 1):
             print(
                 f"  {i}. {player['name']} - {player['predicted_points']} pts "
@@ -1602,7 +1555,7 @@ try:
         print("\n🎯 Best Value Picks: No affordable players found")
 
     if recommendations["highest_predicted"]:
-        print("\n📈 Highest Predicted Points:")
+        print("\nHighest Predicted Points:")
         highest_list = recommendations["highest_predicted"][:3]  # Take slice first
         for i, player in enumerate(highest_list, 1):
             print(
@@ -1613,7 +1566,7 @@ try:
         print("\n📈 Highest Predicted Points: No predictions available")
 
     if recommendations["differential_picks"]:
-        print("\n🔥 Differential Picks (<5% owned):")
+        print("\nDifferential Picks (<5% owned):")
         for i, player in enumerate(recommendations["differential_picks"][:3], 1):
             print(
                 f"  {i}. {player['name']} - {player['predicted_points']} pts "
@@ -1634,7 +1587,7 @@ try:
     print(f"⚡ PREDICTED POINTS: {optimal_team['predicted_points']:.1f}")
 
     # Display Starting XI
-    print(f"\n🔥 STARTING XI ({optimal_team['formation']['name']}):")
+    print(f"\nSTARTING XI ({optimal_team['formation']['name']}):")
 
     starting_xi = optimal_team["starting_xi"]
     position_names = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -1646,11 +1599,12 @@ try:
             print(f"\n  {pos_name}:")
             for player in position_players:
                 print(
-                    f"    • {player['name']} ({player['team_name']}) - {player['predicted_points']:.1f}pts - £{player['price']:.1f}m"
+                    f"    - {player['name']} ({player['team_name']}) - {player['predicted_points']:.1f}pts "
+                    f"- £{player['price']:.1f}m"
                 )
 
     # Display Bench
-    print(f"\n🪑 BENCH (4 players):")
+    print(f"\nBENCH (4 players):")
     bench = optimal_team["bench"]
     for i, player in enumerate(bench, 1):
         pos_name = position_names.get(player["position"], "UNK")
@@ -1659,7 +1613,7 @@ try:
         )
 
     # Team summary stats
-    print(f"\n📈 TEAM STATISTICS:")
+    print(f"\nTEAM STATISTICS:")
     team_count = {}
     for player in optimal_team["squad"]:
         team_name = player["team_name"]
@@ -1675,7 +1629,9 @@ try:
         pos_breakdown[player["position"]] += 1
 
     print(
-        f"  Squad Composition: {pos_breakdown[1]} GK, {pos_breakdown[2]} DEF, {pos_breakdown[3]} MID, {pos_breakdown[4]} FWD"
+        "  Squad Composition: "
+        f"{pos_breakdown[1]} GK, {pos_breakdown[2]} DEF, "
+        f"{pos_breakdown[3]} MID, {pos_breakdown[4]} FWD"
     )
 
 except Exception as e:
