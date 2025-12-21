@@ -17,6 +17,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Validate required repository secrets are available
+      - name: Validate required secrets
+        run: |
+          echo "Checking required repository secrets..."
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_KEY }}" ] || [ -z "${{ secrets.API_KEY }}" ]; then
+            echo "ERROR: One or more required secrets are missing."
+            echo "Please add the following repository secrets: SUPABASE_URL, SUPABASE_KEY, API_KEY"
+            exit 1
+          fi
+
       # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -114,6 +124,19 @@ jobs:
           else:
               print('⚠️ Database credentials not available for logging')
           "
+
+          # Run unit tests to validate the codebase after refresh
+          - name: Run tests
+            env:
+              SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+              SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+              API_KEY: ${{ secrets.API_KEY }}
+            run: |
+              echo "Installing test dependencies..."
+              python -m pip install --upgrade pip
+              pip install pytest pytest-mock
+              echo "Running pytest..."
+              pytest src/tests/ --maxfail=1 -q
 
       # Create success summary with timestamp
       - name: Create success summary

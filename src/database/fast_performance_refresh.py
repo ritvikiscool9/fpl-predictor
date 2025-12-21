@@ -28,8 +28,13 @@ class FastPerformanceRefresh:
     def log(self, message: str, level: str = "INFO"):
         """Enhanced logging with timestamps"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        prefix = {"INFO": "ℹ️", "SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "❌"}
-        print(f"[{timestamp}] {prefix.get(level, 'ℹ️')} {message}")
+        prefix = {
+            "INFO": "INFO",
+            "SUCCESS": "SUCCESS",
+            "WARNING": "WARNING",
+            "ERROR": "ERROR",
+        }
+        print(f"[{timestamp}] {prefix.get(level, 'INFO')} {message}")
 
     def get_valid_player_ids(self):
         """Get all valid player IDs from database once"""
@@ -137,9 +142,7 @@ class FastPerformanceRefresh:
                 performances.append(performance)
                 processed_count += 1
 
-            self.log(
-                f"  📊 GW{gw}: {processed_count}/{len(elements)} players processed"
-            )
+            self.log(f"  GW{gw}: {processed_count}/{len(elements)} players processed")
             return performances
 
         except Exception as e:
@@ -153,7 +156,7 @@ class FastPerformanceRefresh:
 
         try:
             supabase.table("player_performances").insert(performances).execute()
-            self.log(f"✅ Inserted {len(performances)} records {batch_name}", "SUCCESS")
+            self.log(f"Inserted {len(performances)} records {batch_name}", "SUCCESS")
             return True
         except Exception as e:
             self.log(f"Error inserting batch {batch_name}: {e}", "ERROR")
@@ -161,7 +164,7 @@ class FastPerformanceRefresh:
 
     def refresh_all_gameweeks(self):
         """Main function to refresh all gameweek performances"""
-        self.log("🚀 Starting Fast Player Performance Refresh", "SUCCESS")
+        self.log("Starting Fast Player Performance Refresh", "SUCCESS")
         self.log("=" * 60)
 
         start_time = time.time()
@@ -222,21 +225,19 @@ class FastPerformanceRefresh:
             )
             total_records = result.count if result.count else 0
 
-            self.log(f"🎉 Refresh Complete! ({elapsed:.1f}s)", "SUCCESS")
-            self.log(f"📊 Total records inserted: {total_records:,}")
-            self.log(f"🎯 Gameweeks processed: {successful_gws}")
+            self.log(f"Refresh Complete! ({elapsed:.1f}s)", "SUCCESS")
+            self.log(f"Total records inserted: {total_records:,}")
+            self.log(f"Gameweeks processed: {successful_gws}")
 
             # Calculate expected records
             expected_per_gw = len(valid_player_ids)
             expected_total = expected_per_gw * len(successful_gws)
 
             if total_records >= expected_total * 0.9:  # 90% threshold
-                self.log(
-                    f"✅ Data quality: EXCELLENT ({total_records}/{expected_total})"
-                )
+                self.log(f"Data quality: EXCELLENT ({total_records}/{expected_total})")
             else:
                 self.log(
-                    f"⚠️  Data quality: NEEDS REVIEW ({total_records}/{expected_total})"
+                    f"Data quality: NEEDS REVIEW ({total_records}/{expected_total})"
                 )
 
             return True
@@ -248,7 +249,7 @@ class FastPerformanceRefresh:
 
 def main():
     """Main execution"""
-    print("🏆 Fast Player Performance Refresh")
+    print("Fast Player Performance Refresh")
     print("Optimized version to fix slow database loading")
     print("=" * 60)
 
@@ -256,10 +257,10 @@ def main():
     success = refresher.refresh_all_gameweeks()
 
     if success:
-        print(f"\n🎯 SUCCESS: Your player_performances table now has complete data!")
-        print(f"💡 You can now test your AI with: python src/test_real_players.py")
+        print(f"\nSUCCESS: Your player_performances table now has complete data!")
+        print(f"You can now test your AI with: python src/test_real_players.py")
     else:
-        print(f"\n❌ FAILED: Check the errors above and try again")
+        print(f"\nFAILED: Check the errors above and try again")
 
 
 if __name__ == "__main__":

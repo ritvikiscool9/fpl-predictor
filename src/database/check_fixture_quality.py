@@ -17,11 +17,11 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def check_fixture_data_quality():
     """Check fixture data for inconsistencies"""
-    print("🔍 Checking Fixture Data Quality...")
+    print("Checking Fixture Data Quality...")
     print("=" * 50)
 
     # Check gameweeks table
-    print("\n📅 GAMEWEEKS TABLE:")
+    print("\nGAMEWEEKS TABLE:")
     try:
         gameweeks_result = supabase.table("gameweeks").select("*").order("id").execute()
         if gameweeks_result.data:
@@ -33,19 +33,19 @@ def check_fixture_data_quality():
                 recent_gws = gw_df.tail(5)
                 print("\nRecent gameweeks:")
                 for _, row in recent_gws.iterrows():
-                    status = "✅ FINISHED" if row.get("is_finished") else "⏳ UPCOMING"
-                    current = "📍 CURRENT" if row.get("is_current") else ""
+                    status = "FINISHED" if row.get("is_finished") else "UPCOMING"
+                    current = "CURRENT" if row.get("is_current") else ""
                     print(
                         f"  GW {row.get('id', 'N/A')}: {row.get('deadline_time', 'N/A')} - {status} {current}"
                     )
         else:
-            print("❌ No gameweeks found")
+            print("No gameweeks found")
 
     except Exception as e:
         print(f"❌ Error checking gameweeks: {e}")
 
     # Check fixtures table
-    print("\n🏟️  FIXTURES TABLE:")
+    print("\nFIXTURES TABLE:")
     try:
         fixtures_result = (
             supabase.table("fixtures")
@@ -109,13 +109,13 @@ def check_fixture_data_quality():
                 print(fixtures_df[available_cols].head(10).to_string(index=False))
 
         else:
-            print("❌ No fixtures found")
+            print("No fixtures found")
 
     except Exception as e:
         print(f"❌ Error checking fixtures: {e}")
 
     # Check for data inconsistencies
-    print(f"\n🚨 INCONSISTENCY CHECK:")
+    print(f"\nINCONSISTENCY CHECK:")
     try:
         # Find gameweeks marked as finished
         finished_gws_result = (
@@ -152,15 +152,15 @@ def check_fixture_data_quality():
 
                     if finished_count == 0 or with_scores == 0:
                         print(
-                            f"  ⚠️  GW {gw}: Marked finished but {finished_count}/{len(fixtures_df)} fixtures finished, {with_scores}/{len(fixtures_df)} have scores"
+                            f"  GW {gw}: Marked finished but {finished_count}/{len(fixtures_df)} fixtures finished, {with_scores}/{len(fixtures_df)} have scores"
                         )
                     else:
                         print(
-                            f"  ✅ GW {gw}: {finished_count}/{len(fixtures_df)} fixtures finished, {with_scores}/{len(fixtures_df)} have scores"
+                            f"  GW {gw}: {finished_count}/{len(fixtures_df)} fixtures finished, {with_scores}/{len(fixtures_df)} have scores"
                         )
 
     except Exception as e:
-        print(f"❌ Error checking inconsistencies: {e}")
+        print(f"Error checking inconsistencies: {e}")
 
 
 if __name__ == "__main__":

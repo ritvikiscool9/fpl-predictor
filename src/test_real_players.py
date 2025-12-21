@@ -369,7 +369,7 @@ class FPLTeamBuilder:
                 f"WARNING: Squad has {len(selected_players)} players instead of required 15!"
             )
         else:
-            print("✅ Squad size requirement met: 15 players selected")
+            print("SUCCESS: Squad size requirement met: 15 players selected")
 
         return pd.DataFrame(selected_players)
 
