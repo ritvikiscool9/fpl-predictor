@@ -60,17 +60,17 @@ def check_fixture_data_quality():
 
             # Analyze by gameweek
             if "gameweek_id" in fixtures_df.columns:
-                gw_analysis = (
-                    fixtures_df.groupby("gameweek_id")
-                    .agg(
-                        {
-                            "finished": ["count", "sum"],
-                            "team_home_score": lambda x: x.notna().sum(),
-                            "team_away_score": lambda x: x.notna().sum(),
-                        }
-                    )
-                    .round(2)
-                )
+                # gw_analysis = (
+                #     fixtures_df.groupby("gameweek_id")
+                #     .agg(
+                #         {
+                #             "finished": ["count", "sum"],
+                #             "team_home_score": lambda x: x.notna().sum(),
+                #             "team_away_score": lambda x: x.notna().sum(),
+                #         }
+                #     )
+                #     .round(2)
+                # )
 
                 print("\nGameweek Analysis:")
                 print("GW | Total | Finished | With Scores")

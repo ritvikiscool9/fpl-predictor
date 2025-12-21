@@ -362,16 +362,40 @@ class FPLDatabaseRefresh:
 
                     gw_data = gw_response.json()
 
+                    # Preload valid player IDs once per run to avoid N+1 queries
+                    # (player_performances.player_id stores the external FPL id)
+                    if "valid_player_ids" not in locals():
+                        try:
+                            players_resp = (
+                                supabase.table("players")
+                                .select("fpl_player_id")
+                                .execute()
+                            )
+                            if players_resp.data:
+                                valid_player_ids = set(
+                                    p.get("fpl_player_id")
+                                    for p in players_resp.data
+                                    if p.get("fpl_player_id") is not None
+                                )
+                                self.log(
+                                    f"Loaded {len(valid_player_ids)} valid player IDs for membership checks"
+                                )
+                            else:
+                                valid_player_ids = set()
+                                self.log(
+                                    "WARNING: No players found when preloading player IDs",
+                                    "WARNING",
+                                )
+                        except Exception as e:
+                            valid_player_ids = set()
+                            self.log(
+                                f"WARNING: Could not preload player IDs: {e}", "WARNING"
+                            )
+
                     # Process each player's performance
                     for element in gw_data["elements"]:
-                        # Skip if player doesn't exist (avoid foreign key errors)
-                        player_exists = (
-                            supabase.table("players")
-                            .select("id")
-                            .eq("fpl_player_id", element["id"])
-                            .execute()
-                        )
-                        if not player_exists.data:
+                        # Skip if player not in our players table (avoid foreign key errors)
+                        if element.get("id") not in valid_player_ids:
                             continue
 
                         stats = element["stats"]
