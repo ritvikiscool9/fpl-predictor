@@ -6,11 +6,11 @@ Comprehensive refresh of all FPL data from multiple sources
 """
 
 import os
-import sys
+
 import requests
 import pandas as pd
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client, Client
 

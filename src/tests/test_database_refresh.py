@@ -1,6 +1,4 @@
-import json
 import types
-import pytest
 
 from src.database import database_refresh
 

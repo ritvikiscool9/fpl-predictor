@@ -6,7 +6,8 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client
 import pandas as pd
-from datetime import datetime
+
+# datetime not used in this module
 
 load_dotenv()
 
@@ -42,7 +43,7 @@ def check_fixture_data_quality():
             print("No gameweeks found")
 
     except Exception as e:
-        print(f"❌ Error checking gameweeks: {e}")
+        print(f"Error checking gameweeks: {e}")
 
     # Check fixtures table
     print("\nFIXTURES TABLE:")
@@ -112,7 +113,7 @@ def check_fixture_data_quality():
             print("No fixtures found")
 
     except Exception as e:
-        print(f"❌ Error checking fixtures: {e}")
+        print(f"Error checking fixtures: {e}")
 
     # Check for data inconsistencies
     print(f"\nINCONSISTENCY CHECK:")
@@ -151,13 +152,17 @@ def check_fixture_data_quality():
                     )
 
                     if finished_count == 0 or with_scores == 0:
-                        print(
-                            f"  GW {gw}: Marked finished but {finished_count}/{len(fixtures_df)} fixtures finished, {with_scores}/{len(fixtures_df)} have scores"
+                        msg = (
+                            f"GW {gw}: Marked finished but {finished_count}/{len(fixtures_df)} "
+                            f"fixtures finished, {with_scores}/{len(fixtures_df)} have scores"
                         )
+                        print(f"  {msg}")
                     else:
-                        print(
-                            f"  GW {gw}: {finished_count}/{len(fixtures_df)} fixtures finished, {with_scores}/{len(fixtures_df)} have scores"
+                        msg = (
+                            f"GW {gw}: {finished_count}/{len(fixtures_df)} fixtures finished, "
+                            f"{with_scores}/{len(fixtures_df)} have scores"
                         )
+                        print(f"  {msg}")
 
     except Exception as e:
         print(f"Error checking inconsistencies: {e}")

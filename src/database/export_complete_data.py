@@ -8,9 +8,7 @@ import os
 import pandas as pd
 from datetime import datetime
 
-config_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "config")
-)
+config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config"))
 if config_path not in sys.path:
     sys.path.append(config_path)
 
@@ -102,7 +100,7 @@ class CompleteDataExporter:
 
             return output_path, len(all_records), unique_gameweeks
         else:
-            print("   ❌ No data to export")
+            print("   No data to export")
             return None, 0, []
 
     def export_by_gameweek(self, output_dir=None):
@@ -238,8 +236,8 @@ def main():
             exporter.verify_export_vs_database(export_file)
         else:
             print("Paginated export failed")
-        except Exception as e:
-            print(f"Paginated export error: {e}")
+    except Exception as e:
+        print(f"Paginated export error: {e}")
 
     # Method 2: Gameweek-by-gameweek export (backup)
     print(f"\nMethod 2: Gameweek-by-Gameweek Export")
@@ -248,9 +246,9 @@ def main():
         if combined_file:
             print(f"Successfully exported {total_records} records by gameweek")
         else:
-            print("❌ Gameweek export failed")
-        except Exception as e:
-            print(f"Gameweek export error: {e}")
+            print("Gameweek export failed")
+    except Exception as e:
+        print(f"Gameweek export error: {e}")
 
     print(f"\nExport complete. Check the generated CSV files.")
 

@@ -24,7 +24,7 @@ def analyze_player_performances_gaps():
         result = supabase.table("player_performances").select("gameweek_id").execute()
 
         if not result.data:
-                print("ERROR: No player_performances data found!")
+            print("ERROR: No player_performances data found!")
             return
 
         df = pd.DataFrame(result.data)
@@ -61,14 +61,14 @@ def analyze_player_performances_gaps():
                 if count < avg_records * 0.8:  # Less than 80% of average
                     inconsistent_gws.append(f"GW{gw}({count})")
 
-                if inconsistent_gws:
-                    print(f"\nGameweeks with low record counts: {inconsistent_gws}")
-                    print(f"    Average records per GW: {avg_records:.0f}")
+            if inconsistent_gws:
+                print(f"\nGameweeks with low record counts: {inconsistent_gws}")
+                print(f"    Average records per GW: {avg_records:.0f}")
 
         return gameweeks_present, gw_counts.to_dict()
 
     except Exception as e:
-            print(f"ERROR: Error analyzing data: {e}")
+        print(f"ERROR: Error analyzing data: {e}")
         return None, None
 
 
@@ -100,17 +100,21 @@ def check_fpl_api_availability():
             test_url = f"https://fantasy.premierleague.com/api/event/{test_gw}/live/"
             test_response = requests.get(test_url)
 
-                if test_response.status_code == 200:
+            if test_response.status_code == 200:
                 test_data = test_response.json()
                 player_count = len(test_data.get("elements", []))
-                    print(f"API test successful - GW{test_gw} has {player_count} player records")
+                print(
+                    f"API test successful - GW{test_gw} has {player_count} player records"
+                )
             else:
-                    print(f"API test failed for GW{test_gw}: HTTP {test_response.status_code}")
+                print(
+                    f"API test failed for GW{test_gw}: HTTP {test_response.status_code}"
+                )
 
         return finished_gws, current_gw
 
     except Exception as e:
-            print(f"ERROR: Error checking FPL API: {e}")
+        print(f"ERROR: Error checking FPL API: {e}")
         return None, None
 
 

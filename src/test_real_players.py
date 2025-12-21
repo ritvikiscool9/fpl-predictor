@@ -1,7 +1,6 @@
 import sys
 import os
 import pandas as pd
-import numpy as np
 from collections import defaultdict
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -153,7 +152,7 @@ class FPLTeamBuilder:
             )  # Good price + good points
         )
 
-        premium_players = players_df[players_df["is_premium"] == True].copy()
+        premium_players = players_df[players_df["is_premium"]].copy()
         if len(premium_players) > 0:
             # Sort by a combination of predicted points and proven quality metrics
             premium_players["premium_score"] = (
@@ -183,11 +182,12 @@ class FPLTeamBuilder:
                     team_counts[player["team_id"]] += 1
                     premium_selected += 1
 
-                    print(
-                        f"Selected (Premium): {player['web_name']:<15} ({position}) - £{player['price_display']:.1f}m - "
-                        f"Pred: {player['predicted_points']:.2f} pts - "
+                    msg = (
+                        f"Selected (Premium): {player['web_name']:<15} ({position}) - "
+                        f"£{player['price_display']:.1f}m | Pred: {player['predicted_points']:.2f} pts | "
                         f"Value: {player['predicted_points_per_million']:.3f}"
                     )
+                    print(msg)
 
         # Phase 2: Fill with quality players using data-driven team strength
         remaining_players = players_df[
@@ -211,7 +211,7 @@ class FPLTeamBuilder:
 
         # Prefer quality players but allow budget options
         quality_candidates = remaining_players[
-            (remaining_players["is_quality"] == True)
+            (remaining_players["is_quality"])
             & (remaining_players["price_display"] >= 4.0)  # Minimum viability
             & (remaining_players["price_display"] <= 15.0)  # Maximum reasonable
             & (remaining_players["selected_by_percent"] >= 0.5)  # Some ownership
@@ -267,7 +267,7 @@ class FPLTeamBuilder:
                 f"\nNeed {self.squad_size - len(selected_players)} more players. Relaxing constraints..."
             )
 
-            remaining_needed = self.squad_size - len(selected_players)
+            # remaining_needed not used directly; compute inline when needed
             fallback_players = players_df[
                 ~players_df["fpl_player_id"].isin(
                     [p["fpl_player_id"] for p in selected_players]
@@ -299,16 +299,18 @@ class FPLTeamBuilder:
                         team_counts.get(player["team_id"], 0) + 1
                     )
 
-                    print(
-                        f"Selected (Fallback): {player['web_name']:<15} ({position}) - £{player['price_display']:.1f}m - "
-                        f"Pred: {player['predicted_points']:.2f} pts - "
+                    msg = (
+                        f"Selected (Fallback): {player['web_name']:<15} ({position}) - "
+                        f"£{player['price_display']:.1f}m | Pred: {player['predicted_points']:.2f} pts | "
                         f"Value: {player['predicted_points_per_million']:.3f}"
                     )
+                    print(msg)
 
         # Final check - if still not 15 players, FORCE complete the squad
         if len(selected_players) < self.squad_size:
             print(
-                f"\nFORCE filling remaining {self.squad_size - len(selected_players)} slots - ignoring budget if needed..."
+                f"\nFORCE filling remaining {self.squad_size - len(selected_players)} slots - "
+                f"ignoring budget if needed..."
             )
 
             # Calculate minimum budget needed for remaining positions
@@ -348,10 +350,11 @@ class FPLTeamBuilder:
                         team_counts.get(player["team_id"], 0) + 1
                     )
 
-                    print(
-                        f"Selected (FORCE): {player['web_name']:<15} ({needed_position}) - £{player['price_display']:.1f}m - "
-                        f"Pred: {player['predicted_points']:.2f} pts"
+                    msg = (
+                        f"Selected (FORCE): {player['web_name']:<15} ({needed_position}) - "
+                        f"£{player['price_display']:.1f}m | Pred: {player['predicted_points']:.2f} pts"
                     )
+                    print(msg)
 
         # Final squad summary
         total_players = sum(position_counts.values())

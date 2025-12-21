@@ -1,5 +1,4 @@
 import types
-import pytest
 
 from src.database import update_player_prices
 
@@ -80,7 +79,7 @@ def test_update_player_prices_normalizes_and_skips_out_of_range(monkeypatch):
     monkeypatch.setattr(updater, "get_current_fpl_data", lambda: test_fpl_players)
 
     # Run update
-    success = updater.update_player_prices()
+    updater.update_player_prices()
 
     # Ensure updates were made and out-of-range player skipped
     # db id 101 and 102 should have updates recorded

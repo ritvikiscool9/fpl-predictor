@@ -7,7 +7,6 @@ Fetches current FPL player prices and selection percentages from the API
 import os
 import sys
 import requests
-import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -92,17 +91,16 @@ class PlayerPriceUpdater:
 
                 # Validate within expected FPL range (35 = £3.5m to 150 = £15.0m)
                 if not (35 <= now_cost <= 150):
-                    self.log(
-                        f"WARNING: now_cost {now_cost} out of expected range (35-150) for player {fpl_player_id}. Skipping.",
-                        "WARNING",
+                    msg = (
+                        f"now_cost {now_cost} out of expected range (35-150) for player "
+                        f"{fpl_player_id}. Skipping."
                     )
+                    self.log(msg, "WARNING")
                     continue
 
             except Exception as e:
-                self.log(
-                    f"WARNING: Could not parse now_cost for player {fpl_player_id}: {e}. Skipping.",
-                    "WARNING",
-                )
+                msg = f"Could not parse now_cost for player {fpl_player_id}: {e}. Skipping."
+                self.log(msg, "WARNING")
                 continue
 
             # Parse selected_by_percent safely
@@ -203,9 +201,10 @@ class PlayerPriceUpdater:
                 self.log("Sample updated prices:")
                 for record in result.data:
                     cost_in_millions = record["now_cost"] / 10.0
-                    self.log(
-                        f"  Player {record['player_id']}: £{cost_in_millions}m, {record['selected_by_percent']}% selected"
-                    )
+                    player_id = record.get("player_id")
+                    selected_pct = record.get("selected_by_percent")
+                    msg = f"  Player {player_id}: £{cost_in_millions}m, {selected_pct}% selected"
+                    self.log(msg)
 
                 # Count total updated records
                 count_result = (

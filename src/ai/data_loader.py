@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
-from typing import Dict, List, Tuple
-from supabase import create_client, Client
+from typing import List, Tuple
+from supabase import create_client
 from dotenv import load_dotenv
 import os
 
@@ -251,9 +250,12 @@ class FPLDataLoader:
     def test_connection(self):
         """Test supabase connection"""
         try:
-            response = self.supabase.table("players").select("*").limit(1).execute()
-            print("connected to supabase")
-            return True
+            resp = self.supabase.table("players").select("*").limit(1).execute()
+            if resp and getattr(resp, "data", None):
+                print("connected to supabase")
+                return True
+            print("No response from supabase test query")
+            return False
         except Exception as e:
             print(f"Connection failed: {e}")
             return False

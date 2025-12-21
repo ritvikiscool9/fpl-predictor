@@ -5,9 +5,7 @@ Fixes the slow database loading issue
 """
 
 import os
-import sys
 import requests
-import pandas as pd
 import time
 from datetime import datetime
 from dotenv import load_dotenv
