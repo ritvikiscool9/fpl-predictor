@@ -1,0 +1,156 @@
+name: Weekly Database Refresh
+
+on:
+  schedule:
+    # Run every Sunday at 3 AM UTC 
+    - cron: '0 3 * * 0'
+  
+  # Allow manual triggering from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  refresh-database:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Configure Python environment for database scripts
+      - name: Setup Python environment
+        run: |
+          python -c "import sys; print(f'Python version: {sys.version}')"
+          python -c "import os; print(f'Working directory: {os.getcwd()}')"
+
+      # Run fast performance refresh (730x faster)
+      - name: Refresh player performance data
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          echo "Starting player performance refresh..."
+          python src/database/fast_performance_refresh.py
+          echo "Performance refresh completed successfully"
+
+      # Update current player prices
+      - name: Update player prices
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          echo "Starting player price update..."
+          python src/database/update_player_prices.py
+          echo "Price update completed successfully"
+
+      # Verify database health after refresh
+      - name: Verify database health
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          echo "Verifying database health..."
+          python src/database/check_database.py
+          echo "Database verification completed"
+
+      # Optional: Export updated data for backup
+      - name: Export complete data (backup)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          echo "Creating data backup..."
+          python src/database/export_complete_data.py
+          echo "Data backup completed"
+
+      # Log refresh completion to database
+      - name: Log refresh to database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          echo "Logging refresh completion..."
+          python -c "
+          import os
+          from datetime import datetime
+          from supabase import create_client, Client
+          
+          # Initialize Supabase client
+          url = os.environ.get('SUPABASE_URL')
+          key = os.environ.get('SUPABASE_KEY')
+          if url and key:
+              supabase: Client = create_client(url, key)
+              
+              # Log the refresh
+              refresh_log = {
+                  'refresh_type': 'weekly_automated',
+                  'timestamp': datetime.utcnow().isoformat(),
+                  'status': 'completed',
+                  'github_run_id': '${{ github.run_id }}',
+                  'notes': 'Automated weekly refresh via GitHub Actions'
+              }
+              
+              try:
+                  result = supabase.table('refresh_logs').insert(refresh_log).execute()
+                  print('✅ Refresh logged to database successfully')
+              except Exception as e:
+                  print(f'⚠️ Could not log to database: {e}')
+          else:
+              print('⚠️ Database credentials not available for logging')
+          "
+
+      # Create success summary with timestamp
+      - name: Create success summary
+        if: success()
+        run: |
+          echo "✅ Weekly database refresh completed successfully!"
+          echo "🕐 Completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "📊 Summary:"
+          echo "- Player performance data updated"
+          echo "- Current prices refreshed" 
+          echo "- Database health verified"
+          echo "- Data backup created"
+          echo ""
+          echo "🔗 View logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      # Create failure summary with troubleshooting
+      - name: Create failure summary
+        if: failure()
+        run: |
+          echo "❌ Weekly database refresh failed!"
+          echo "🕐 Failed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "🔧 Troubleshooting steps:"
+          echo "1. Check repository secrets are set correctly"
+          echo "2. Verify Supabase connection"
+          echo "3. Run manual refresh: python src/database/fast_performance_refresh.py"
+          echo ""
+          echo "🔗 View failure logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          exit 1
+
+      # Generate workflow badge data
+      - name: Generate status badge
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "LAST_REFRESH_STATUS=success" >> $GITHUB_ENV
+            echo "LAST_REFRESH_TIME=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_ENV
+          else
+            echo "LAST_REFRESH_STATUS=failed" >> $GITHUB_ENV
+            echo "LAST_REFRESH_TIME=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_ENV
+          fi
