@@ -5,6 +5,7 @@ Fixes the slow database loading issue
 """
 
 import os
+import sys
 import requests
 import time
 from datetime import datetime
@@ -13,8 +14,27 @@ from supabase import create_client
 
 load_dotenv()
 
-# Initialize Supabase client
-supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+
+# Initialize Supabase client with validation
+def init_supabase():
+    """Initialize Supabase client with error handling"""
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+
+    if not url or not key:
+        print("ERROR: SUPABASE_URL or SUPABASE_KEY environment variables not set")
+        print("Please set these environment variables before running this script")
+        sys.exit(1)
+
+    try:
+        client = create_client(url, key)
+        return client
+    except Exception as e:
+        print(f"ERROR: Failed to initialize Supabase client: {e}")
+        sys.exit(1)
+
+
+supabase = init_supabase()
 
 
 class FastPerformanceRefresh:
