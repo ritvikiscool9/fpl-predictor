@@ -44,7 +44,7 @@ def init_refresh_logs_table():
                 supabase.table("refresh_logs").delete().eq(
                     "github_run_id", "0"
                 ).execute()
-            except:
+            except Exception:
                 pass
 
             return True
