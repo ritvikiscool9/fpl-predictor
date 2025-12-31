@@ -104,49 +104,49 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        continue-on-error: true
         run: |
           echo "Logging refresh completion..."
-          python -c "
-          import os
-          from datetime import datetime
-          from supabase import create_client, Client
-          
-          # Initialize Supabase client
-          url = os.environ.get('SUPABASE_URL')
-          key = os.environ.get('SUPABASE_KEY')
-          if url and key:
-              supabase: Client = create_client(url, key)
-              
-              # Log the refresh
-              refresh_log = {
-                  'refresh_type': 'weekly_automated',
-                  'timestamp': datetime.utcnow().isoformat(),
-                  'status': 'completed',
-                  'github_run_id': '${{ github.run_id }}',
-                  'notes': 'Automated weekly refresh via GitHub Actions'
-              }
-              
-              try:
-                  result = supabase.table('refresh_logs').insert(refresh_log).execute()
-                  print('✅ Refresh logged to database successfully')
-              except Exception as e:
-                  print(f'⚠️ Could not log to database: {e}')
-          else:
-              print('⚠️ Database credentials not available for logging')
-          "
+          python3 << 'PYEOF'
+import os
+from datetime import datetime, timezone
+from supabase import create_client
 
-          # Run unit tests to validate the codebase after refresh
-          - name: Run tests
-            env:
-              SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-              SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-              API_KEY: ${{ secrets.API_KEY }}
-            run: |
-              echo "Installing test dependencies..."
-              python -m pip install --upgrade pip
-              pip install pytest pytest-mock
-              echo "Running pytest..."
-              pytest src/tests/ -v --tb=short || echo "Tests completed with warnings"
+url = os.environ.get('SUPABASE_URL')
+key = os.environ.get('SUPABASE_KEY')
+github_run_id = os.environ.get('GITHUB_RUN_ID')
+
+if url and key:
+    try:
+        supabase = create_client(url, key)
+        refresh_log = {
+            'refresh_type': 'weekly_automated',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'status': 'completed',
+            'github_run_id': github_run_id,
+            'notes': 'Automated weekly refresh via GitHub Actions'
+        }
+        result = supabase.table('refresh_logs').insert(refresh_log).execute()
+        print('✅ Refresh logged to database successfully')
+    except Exception as e:
+        print(f'⚠️ Could not log to database: {e}')
+else:
+    print('⚠️ Database credentials not available for logging')
+PYEOF
+
+      # Run unit tests to validate the codebase after refresh
+      - name: Run tests
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          echo "Installing test dependencies..."
+          python -m pip install --upgrade pip
+          pip install pytest pytest-mock
+          echo "Running pytest..."
+          pytest src/tests/ -v --tb=short || echo "Tests completed with warnings"
 
       # Create success summary with timestamp
       - name: Create success summary
