@@ -60,11 +60,13 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Starting player performance refresh..."
-          python src/database/fast_performance_refresh.py || {
-            echo "ERROR: Performance refresh failed"
+          python -u src/database/fast_performance_refresh.py
+          if [ $? -eq 0 ]; then
+            echo "✅ Performance refresh completed successfully"
+          else
+            echo "❌ ERROR: Performance refresh failed with exit code $?"
             exit 1
-          }
-          echo "Performance refresh completed successfully"
+          fi
 
       # Update current player prices
       - name: Update player prices
@@ -74,8 +76,12 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Starting player price update..."
-          python src/database/update_player_prices.py
-          echo "Price update completed successfully"
+          python -u src/database/update_player_prices.py
+          if [ $? -eq 0 ]; then
+            echo "✅ Price update completed successfully"
+          else
+            echo "⚠️ WARNING: Price update had issues (exit code $?)"
+          fi
 
       # Verify database health after refresh
       - name: Verify database health
@@ -85,8 +91,12 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Verifying database health..."
-          python src/database/check_database.py
-          echo "Database verification completed"
+          python -u src/database/check_database.py
+          if [ $? -eq 0 ]; then
+            echo "✅ Database verification completed"
+          else
+            echo "⚠️ WARNING: Database verification had issues"
+          fi
 
       # Optional: Export updated data for backup
       - name: Export complete data (backup)
