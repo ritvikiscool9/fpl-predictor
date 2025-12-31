@@ -1,6 +1,6 @@
 import types
 
-from src.database import update_player_prices
+from ..database import update_player_prices
 
 
 class FakeTableUpdate:

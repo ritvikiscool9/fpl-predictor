@@ -1,6 +1,6 @@
 import types
 
-from src.database import database_refresh
+from ..database import database_refresh
 
 
 class FakeResponse:
