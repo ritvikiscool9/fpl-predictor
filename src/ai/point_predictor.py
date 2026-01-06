@@ -164,12 +164,11 @@ if __name__ == "__main__":
     feature_engine = FPLFeatureEngineering()
     predictor = PlayerPointsPredictor()
 
-    # Load and enhance data (reuse your working pipeline)
+    # Load and enhance data
     print("\nLoading and preparing data...")
     historical_data = loader.load_player_data()
 
     if not historical_data.empty:
-        # Apply the same feature engineering that worked
         enhanced_data = feature_engine.create_player_features(historical_data)
         enhanced_data = feature_engine.create_team_features(enhanced_data)
         enhanced_data = feature_engine.add_fixture_difficulty(enhanced_data)
