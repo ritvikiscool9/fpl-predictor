@@ -85,10 +85,6 @@ class FPLPlayerRecommender:
         try:
             raw_predictions = self.predictor.predict(comparison_data)
 
-            # ENHANCED: Scale predictions to realistic FPL ranges with data-driven quality bias
-            # Raw predictions are ~0.5-1.0, realistic FPL is 2-15+ points
-            # Apply intelligent scaling based on actual player metrics from database
-
             scaled_predictions = []
             for i, pred in enumerate(raw_predictions):
                 player = comparison_data.iloc[i]
